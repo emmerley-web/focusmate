@@ -1,3 +1,16 @@
+Here's the complete updated index.html with the correct date format:
+
+Go to GitHub:
+
+Click on index.html
+
+Click edit (pencil icon)
+
+Select all and delete
+
+Paste this entire code:
+
+xml
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -428,12 +441,12 @@
 
             try {
                 const weekData = getWeekData(timezone);
-                const startDate = weekData.weekStart.toISOString().split('T')[0];
-                const endDate = new Date(weekData.weekStart.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+                const startDate = weekData.weekStart.toISOString();
+                const endDate = new Date(weekData.weekStart.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
                 // Call your Vercel backend
                 const response = await fetch(
-                    `/api/focusmate?start=${startDate}&end=${endDate}`
+                    `/api/focusmate?start=${encodeURIComponent(startDate)}&end=${encodeURIComponent(endDate)}`
                 );
 
                 if (!response.ok) {
