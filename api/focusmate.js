@@ -27,19 +27,20 @@ export default async function handler(req, res) {
 
   try {
     const response = await fetch(
-      `https://api.focusmate.com/sessions?start=${start}&end=${end}`,
+      `https://api.focusmate.com/v1/sessions?start=${start}&end=${end}`,
       {
         headers: {
-          'Authorization': `Bearer ${apiKey}`,
+          'X-API-KEY': apiKey,
           'Content-Type': 'application/json'
         }
       }
     );
 
     if (!response.ok) {
+      const text = await response.text();
       return res.status(response.status).json({
         error: `FocusMate API returned ${response.status}`,
-        details: await response.text()
+        details: text
       });
     }
 
