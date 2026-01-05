@@ -450,9 +450,9 @@
                     return;
                 }
 
-                // FILTER: Only count sessions where both users completed (completed === true)
-                // This excludes sessions where no partner was found
-                const filteredSessions = data.sessions.filter(s => s.completed === true);
+                // FILTER: Only count sessions where 2+ users joined (real partnerships)
+                // This excludes sessions where no partner showed up
+                const filteredSessions = data.sessions.filter(s => s.users && s.users.length >= 2);
 
                 processSessionData(filteredSessions, timezone, targetUnits);
                 showSuccess(`Loaded ${filteredSessions.length} sessions`);
