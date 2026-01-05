@@ -450,9 +450,9 @@
                     return;
                 }
 
-                // FILTER: Only count sessions that are 15+ minutes long (900+ seconds)
-                // This removes false starts where no partner was found
-                const filteredSessions = data.sessions.filter(s => s.duration >= 900);
+                // FILTER: Only count sessions where both users completed (completed === true)
+                // This excludes sessions where no partner was found
+                const filteredSessions = data.sessions.filter(s => s.completed === true);
 
                 processSessionData(filteredSessions, timezone, targetUnits);
                 showSuccess(`Loaded ${filteredSessions.length} sessions`);
