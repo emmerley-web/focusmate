@@ -191,6 +191,13 @@
             font-weight: 600;
         }
 
+        .last-updated {
+            text-align: center;
+            font-size: 11px;
+            color: var(--color-text-secondary);
+            margin-top: 12px;
+        }
+
         .controls-section {
             margin-top: 24px;
         }
@@ -269,13 +276,6 @@
             font-size: 14px;
         }
 
-        .last-updated {
-            text-align: center;
-            font-size: 11px;
-            color: var(--color-text-secondary);
-            margin-top: 12px;
-        }
-
         @media (prefers-color-scheme: light) {
             :root {
                 --color-bg: #fcfcf9;
@@ -348,9 +348,7 @@
     </div>
 
     <script>
-        const API_KEY = '25e87c73380b4e32bc8684bae4eb0259';
         const TIMEZONE_STORAGE = 'focusmate_timezone';
-        const CUSTOM_TARGET_STORAGE = 'focusmate_custom_target';
         let refreshInterval;
 
         document.addEventListener('DOMContentLoaded', () => {
@@ -433,23 +431,22 @@
                 const startDate = weekData.weekStart.toISOString().split('T')[0];
                 const endDate = new Date(weekData.weekStart.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
-                const apiUrl = `https://api.focusmate.com/sessions?start=${startDate}&end=${endDate}`;
-                const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(apiUrl)}`;
-
-                const response = await fetch(proxyUrl, {
-                    headers: { 'Authorization': `Bearer ${API_KEY}` }
-                });
+                // Call your Vercel backend
+                const response = await fetch(
+                    `/api/focusmate?start=${startDate}&end=${endDate}`
+                );
 
                 if (!response.ok) {
-                    throw new Error(`API Error: ${response.status}`);
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || `API returned ${response.status}`);
                 }
 
-                const proxyData = await response.json();
-                const data = JSON.parse(proxyData.contents);
+                const data = await response.json();
                 
                 if (!data.sessions || data.sessions.length === 0) {
                     showError('No sessions found for this week');
                     processSessionData([], timezone, targetUnits);
+                    updateLastUpdated();
                     return;
                 }
 
@@ -457,9 +454,8 @@
                 showSuccess(`Loaded ${data.sessions.length} sessions`);
                 updateLastUpdated();
             } catch (error) {
-                console.error(error);
+                console.error('Fetch error:', error);
                 showError(`API Error: ${error.message}`);
-                processSessionData([], timezone, targetUnits);
                 updateLastUpdated();
             }
         }
@@ -544,7 +540,10 @@
         function updateLastUpdated() {
             const now = new Date();
             const time = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-            document.getElementById('lastUpdated').textContent = `Last updated: ${time}`;
+            const lastUpdated = document.getElementById('lastUpdated');
+            if (lastUpdated) {
+                lastUpdated.textContent = `Last updated: ${time}`;
+            }
         }
 
         function exportCSV() {
