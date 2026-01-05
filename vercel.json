@@ -1,0 +1,5 @@
+{
+  "env": {
+    "FOCUSMATE_API_KEY": "@focusmate_api_key"
+  }
+}
