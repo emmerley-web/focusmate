@@ -44,49 +44,9 @@
             margin-bottom: 32px;
         }
 
-        .header-left {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
         .header h1 {
             font-size: 28px;
             font-weight: 600;
-        }
-
-        .info-icon {
-            background: none;
-            border: none;
-            color: var(--color-text-secondary);
-            cursor: pointer;
-            font-size: 18px;
-            padding: 4px 8px;
-            border-radius: 4px;
-            transition: color 0.2s ease;
-        }
-
-        .info-icon:hover {
-            color: var(--color-primary);
-        }
-
-        .tooltip {
-            display: none;
-            position: absolute;
-            background-color: var(--color-surface);
-            border: 1px solid var(--color-border);
-            color: var(--color-text);
-            padding: 12px 16px;
-            border-radius: 8px;
-            font-size: 13px;
-            z-index: 1000;
-            margin-top: 8px;
-            white-space: nowrap;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-        }
-
-        .tooltip.show {
-            display: block;
         }
 
         .theme-toggle {
@@ -107,13 +67,20 @@
             margin-bottom: 20px;
         }
 
+        .week-indicator {
+            text-align: center;
+            font-size: 12px;
+            color: var(--color-text-secondary);
+            margin-bottom: 16px;
+        }
+
         .week-summary {
             text-align: center;
             margin-bottom: 24px;
         }
 
         .week-text {
-            font-size: 24px;
+            font-size: 32px;
             font-weight: 700;
             color: var(--color-primary);
             margin-bottom: 8px;
@@ -165,14 +132,6 @@
         .tracker-square.banked::after {
             content: '★';
             font-weight: 700;
-        }
-
-        .tracker-info {
-            text-align: center;
-            font-size: 14px;
-            color: var(--color-text-secondary);
-            margin-bottom: 12px;
-            font-weight: 500;
         }
 
         .daily-bars {
@@ -297,20 +256,13 @@
             transition: all 0.2s ease;
         }
 
-        .history-btn:hover {
+        .history-btn:hover:not(:disabled) {
             background-color: rgba(119, 124, 124, 0.3);
         }
 
         .history-btn:disabled {
-            opacity: 0.5;
+            opacity: 0.4;
             cursor: not-allowed;
-        }
-
-        .week-indicator {
-            text-align: center;
-            font-size: 12px;
-            color: var(--color-text-secondary);
-            margin-bottom: 12px;
         }
 
         .sparkline-section {
@@ -454,11 +406,7 @@
 <body>
     <div class="container">
         <div class="header">
-            <div class="header-left">
-                <h1>FocusMate</h1>
-                <button class="info-icon" id="infoBtn" title="About blocks">ℹ️</button>
-                <div class="tooltip" id="infoTooltip">1 square = 1 × 25-min session</div>
-            </div>
+            <h1>FocusMate Tracker</h1>
             <button class="theme-toggle" id="themeToggle">🌙</button>
         </div>
 
@@ -468,7 +416,7 @@
             <div class="week-indicator" id="weekIndicator">Week 1 (Jan 5-11)</div>
             
             <div class="week-summary">
-                <div class="week-text" id="weekUnits">Week: 0/40 • Complete: 0/40</div>
+                <div class="week-text" id="weekUnits">Complete: 0/40</div>
             </div>
 
             <div class="tracker-grid" id="trackerGrid"></div>
@@ -552,8 +500,8 @@
         const WEEKS_STORAGE = 'focusmate_weeks';
         const CURRENT_WEEK_STORAGE = 'focusmate_current_week_number';
         let refreshInterval;
-        let currentViewingWeekOffset = 0; // 0 = this week, 1 = last week, etc.
-        let allWeeksData = {}; // Store all weeks data
+        let currentViewingWeekOffset = 0;
+        let allWeeksData = {};
 
         document.addEventListener('DOMContentLoaded', () => {
             loadSettings();
@@ -601,7 +549,6 @@
             const holidayToggle = document.getElementById('holidayToggle');
             const customTarget = document.getElementById('customTarget');
             const themeToggle = document.getElementById('themeToggle');
-            const infoBtn = document.getElementById('infoBtn');
             const prevWeekBtn = document.getElementById('prevWeekBtn');
             const nextWeekBtn = document.getElementById('nextWeekBtn');
             
@@ -619,23 +566,8 @@
             }
             if (customTarget) customTarget.onchange = saveSettings;
             if (themeToggle) themeToggle.onclick = toggleTheme;
-            if (infoBtn) infoBtn.onclick = toggleInfoTooltip;
             if (prevWeekBtn) prevWeekBtn.onclick = goToPreviousWeek;
             if (nextWeekBtn) nextWeekBtn.onclick = goToNextWeek;
-
-            // Close tooltip when clicking elsewhere
-            document.addEventListener('click', (e) => {
-                const tooltip = document.getElementById('infoTooltip');
-                if (tooltip && !e.target.closest('.info-icon') && !e.target.closest('.tooltip')) {
-                    tooltip.classList.remove('show');
-                }
-            });
-        }
-
-        function toggleInfoTooltip(e) {
-            e.stopPropagation();
-            const tooltip = document.getElementById('infoTooltip');
-            tooltip.classList.toggle('show');
         }
 
         function loadSettings() {
@@ -669,7 +601,6 @@
         }
 
         function getWeekNumber() {
-            // Week numbering: Week 1 = Jan 5-11, 2026
             const weekStart = new Date('2026-01-05');
             const now = new Date();
             const diffTime = now - weekStart;
@@ -681,8 +612,7 @@
             const currentWeekNum = getWeekNumber();
             const targetWeekNum = currentWeekNum - weekOffset;
             
-            // Calculate the Monday of the target week
-            const weekStart = new Date('2026-01-05'); // Week 1 start
+            const weekStart = new Date('2026-01-05');
             weekStart.setDate(weekStart.getDate() + (targetWeekNum - 1) * 7);
             weekStart.setHours(0, 0, 0, 0);
             
@@ -712,13 +642,13 @@
             const isCurrentWeek = currentViewingWeekOffset === 0;
             const { weekNum } = getWeekData(timezone, currentViewingWeekOffset);
             
-            document.getElementById('prevWeekBtn').disabled = !isCurrentWeek && currentViewingWeekOffset >= getWeekNumber() - 1;
+            const maxOffset = getWeekNumber() - 1;
+            document.getElementById('prevWeekBtn').disabled = currentViewingWeekOffset >= maxOffset;
             document.getElementById('nextWeekBtn').style.display = isCurrentWeek ? 'none' : 'block';
 
             if (isCurrentWeek) {
                 fetchSessions();
             } else {
-                // Load historical data
                 const weekKey = `week_${weekNum}`;
                 if (allWeeksData[weekKey]) {
                     const data = allWeeksData[weekKey];
@@ -730,7 +660,7 @@
         }
 
         async function fetchSessions() {
-            if (currentViewingWeekOffset !== 0) return; // Only fetch current week
+            if (currentViewingWeekOffset !== 0) return;
 
             const timezone = document.getElementById('timezone').value;
             const isCustom = document.getElementById('holidayToggle').checked;
@@ -792,14 +722,12 @@
                 }
             });
 
-            // Get banked from previous week
             const prevWeekKey = `week_${weekNum - 1}`;
             const bankedFromPrevious = allWeeksData[prevWeekKey] ? allWeeksData[prevWeekKey].bankedForNextWeek : 0;
             const unitsNeeded = Math.max(0, targetUnits - bankedFromPrevious);
             const surplus = Math.max(0, totalUnits - unitsNeeded);
             const bankedForNext = bankedFromPrevious + surplus;
 
-            // Save this week's data
             const weekKey = `week_${weekNum}`;
             allWeeksData[weekKey] = {
                 weekNum,
@@ -824,10 +752,9 @@
         function updateUI(units, target, dailyUnits, weekNum, bankedFromPrevious = 0, bankedForNext = 0) {
             const unitsNeeded = Math.max(0, target - bankedFromPrevious);
             const filledCount = Math.min(units, target);
-            const bankedCount = Math.min(Math.max(0, units - unitsNeeded), bankedFromPrevious + (units - unitsNeeded));
 
-            // Update header
-            document.getElementById('weekUnits').textContent = `Week ${weekNum}/${target} • Complete: ${units}/${target}`;
+            // Update header - JUST the completion
+            document.getElementById('weekUnits').textContent = `Complete: ${units}/${target}`;
             
             const weekStart = new Date('2026-01-05');
             weekStart.setDate(weekStart.getDate() + (weekNum - 1) * 7);
