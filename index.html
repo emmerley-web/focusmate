@@ -67,20 +67,13 @@
             margin-bottom: 20px;
         }
 
-        .week-indicator {
-            text-align: center;
-            font-size: 12px;
-            color: var(--color-text-secondary);
-            margin-bottom: 16px;
-        }
-
         .week-summary {
             text-align: center;
             margin-bottom: 24px;
         }
 
         .week-text {
-            font-size: 32px;
+            font-size: 24px;
             font-weight: 700;
             color: var(--color-primary);
             margin-bottom: 8px;
@@ -413,10 +406,8 @@
         <div id="messageContainer"></div>
 
         <div class="card">
-            <div class="week-indicator" id="weekIndicator">Week 1 (Jan 5-11)</div>
-            
             <div class="week-summary">
-                <div class="week-text" id="weekUnits">Complete: 0/40</div>
+                <div class="week-text" id="weekUnits">Week 1 (Jan 5-11) • 0/40 Complete</div>
             </div>
 
             <div class="tracker-grid" id="trackerGrid"></div>
@@ -723,156 +714,4 @@
             });
 
             const prevWeekKey = `week_${weekNum - 1}`;
-            const bankedFromPrevious = allWeeksData[prevWeekKey] ? allWeeksData[prevWeekKey].bankedForNextWeek : 0;
-            const unitsNeeded = Math.max(0, targetUnits - bankedFromPrevious);
-            const surplus = Math.max(0, totalUnits - unitsNeeded);
-            const bankedForNext = bankedFromPrevious + surplus;
-
-            const weekKey = `week_${weekNum}`;
-            allWeeksData[weekKey] = {
-                weekNum,
-                weekStart: weekData.weekStart.toISOString(),
-                completed: totalUnits,
-                target: targetUnits,
-                dailyUnits,
-                bankedFromPrevious,
-                surplus,
-                bankedForNextWeek: bankedForNext
-            };
-            saveAllWeeksData();
-
-            updateUI(totalUnits, targetUnits, dailyUnits, weekNum, bankedFromPrevious, bankedForNext);
-            updateSparkline();
-        }
-
-        function updateUIFromHistory(weekData, weekNum, targetUnits) {
-            updateUI(weekData.completed, targetUnits, weekData.dailyUnits, weekNum, weekData.bankedFromPrevious, weekData.bankedForNextWeek);
-        }
-
-        function updateUI(units, target, dailyUnits, weekNum, bankedFromPrevious = 0, bankedForNext = 0) {
-            const unitsNeeded = Math.max(0, target - bankedFromPrevious);
-            const filledCount = Math.min(units, target);
-
-            // Update header - JUST the completion
-            document.getElementById('weekUnits').textContent = `Complete: ${units}/${target}`;
-            
-            const weekStart = new Date('2026-01-05');
-            weekStart.setDate(weekStart.getDate() + (weekNum - 1) * 7);
-            const weekEnd = new Date(weekStart);
-            weekEnd.setDate(weekEnd.getDate() + 6);
-            const dateStr = `${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}-${weekEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
-            document.getElementById('weekIndicator').textContent = `Week ${weekNum} (${dateStr})`;
-
-            // Update squares with banking visualization
-            for (let i = 1; i <= 40; i++) {
-                const sq = document.querySelector(`.tracker-square[data-unit="${i}"]`);
-                if (sq) {
-                    sq.classList.remove('filled', 'banked');
-                    if (i <= filledCount) {
-                        sq.classList.add('filled');
-                        sq.style.transitionDelay = `${(i - 1) * 0.05}s`;
-                    } else if (i <= filledCount + bankedFromPrevious && bankedFromPrevious > 0) {
-                        sq.classList.add('banked');
-                        sq.style.transitionDelay = `${(i - 1) * 0.05}s`;
-                    }
-                }
-            }
-
-            // Update daily bars
-            const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-            days.forEach(day => {
-                const dayU = dailyUnits[day] || 0;
-                const pct = Math.min((dayU / 8) * 100, 100);
-                const barFill = document.querySelector(`.day-bar-fill[data-day="${day}"]`);
-                const dayText = document.querySelector(`.day-units[data-day="${day}"]`);
-                if (barFill) barFill.style.height = `${pct}%`;
-                if (dayText) dayText.textContent = dayU;
-            });
-
-            // Update status
-            const pct = (units / target) * 100;
-            const icon = document.getElementById('statusIcon');
-            const text = document.getElementById('statusText');
-            if (pct >= 100) {
-                icon.textContent = '🟢';
-                text.textContent = 'Complete! 🎉';
-            } else if (pct >= 80) {
-                icon.textContent = '🟢';
-                text.textContent = 'On track! 🎉';
-            } else if (pct >= 40) {
-                icon.textContent = '🟡';
-                text.textContent = 'Getting there 💪';
-            } else {
-                icon.textContent = '🔴';
-                text.textContent = 'Keep going 🚀';
-            }
-
-            // Show progress bars only if ahead of target
-            const surplus = Math.max(0, units - unitsNeeded);
-            const progressSection = document.getElementById('progressSection');
-            if (surplus > 0 && currentViewingWeekOffset === 0) {
-                progressSection.style.display = 'block';
-                const completedPct = (units / target) * 100;
-                const bankedPct = (bankedForNext / target) * 100;
-                document.getElementById('progressCompletedBar').style.width = `${Math.min(completedPct, 100)}%`;
-                document.getElementById('progressCompletedLabel').textContent = `${units}/${target}`;
-                document.getElementById('progressBankedBar').style.width = `${Math.min(bankedPct, 100)}%`;
-                document.getElementById('progressBankedLabel').textContent = `${bankedForNext}`;
-            } else {
-                progressSection.style.display = 'none';
-            }
-        }
-
-        function updateSparkline() {
-            const bars = document.querySelectorAll('.sparkline-bar');
-            const last8Weeks = [];
-            
-            for (let i = 7; i >= 0; i--) {
-                const weekNum = getWeekNumber() - i;
-                const weekKey = `week_${weekNum}`;
-                const completed = allWeeksData[weekKey] ? allWeeksData[weekKey].completed : 0;
-                last8Weeks.push(completed);
-            }
-
-            const maxCompleted = Math.max(...last8Weeks, 40);
-            
-            bars.forEach((bar, idx) => {
-                const height = (last8Weeks[idx] / maxCompleted) * 100;
-                bar.style.height = `${Math.max(height, 5)}%`;
-            });
-        }
-
-        function updateLastUpdated() {
-            const now = new Date();
-            const time = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-            const lastUpdated = document.getElementById('lastUpdated');
-            if (lastUpdated) {
-                lastUpdated.textContent = `Last updated: ${time}`;
-            }
-        }
-
-        function exportCSV() {
-            const units = document.getElementById('weekUnits').textContent;
-            const tz = document.getElementById('timezone').value;
-            const date = new Date().toISOString().split('T')[0];
-            const csv = `data:text/csv;charset=utf-8,Date,Units,Timezone\n${date},${units},${tz}`;
-            const link = document.createElement('a');
-            link.href = encodeURI(csv);
-            link.download = `focusmate-${date}.csv`;
-            link.click();
-        }
-
-        function showSuccess(msg) {
-            const container = document.getElementById('messageContainer');
-            container.innerHTML = `<div class="success-message">${msg}</div>`;
-            setTimeout(() => { container.innerHTML = ''; }, 3000);
-        }
-
-        function showError(msg) {
-            const container = document.getElementById('messageContainer');
-            container.innerHTML = `<div class="error-message">${msg}</div>`;
-            setTimeout(() => { container.innerHTML = ''; }, 5000);
-        }
-    </script>
-</body>
-</html>
+            const bankedFromPrev
