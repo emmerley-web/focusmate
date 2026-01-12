@@ -49,16 +49,6 @@
             font-weight: 600;
         }
 
-        .theme-toggle {
-            background: var(--color-surface);
-            border: 1px solid var(--color-border);
-            color: var(--color-text);
-            padding: 8px 12px;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 16px;
-        }
-
         .card {
             background-color: var(--color-surface);
             border: 1px solid var(--color-border);
@@ -406,7 +396,6 @@
     <div class="container">
         <div class="header">
             <h1>FocusMate Tracker</h1>
-            <button class="theme-toggle" id="themeToggle">🌙</button>
         </div>
 
         <div id="messageContainer"></div>
@@ -546,7 +535,6 @@
             const timezone = document.getElementById('timezone');
             const holidayToggle = document.getElementById('holidayToggle');
             const customTarget = document.getElementById('customTarget');
-            const themeToggle = document.getElementById('themeToggle');
             const prevWeekBtn = document.getElementById('prevWeekBtn');
             const nextWeekBtn = document.getElementById('nextWeekBtn');
             
@@ -563,7 +551,6 @@
                 };
             }
             if (customTarget) customTarget.onchange = saveSettings;
-            if (themeToggle) themeToggle.onclick = toggleTheme;
             if (prevWeekBtn) prevWeekBtn.onclick = goToPreviousWeek;
             if (nextWeekBtn) nextWeekBtn.onclick = goToNextWeek;
         }
@@ -575,12 +562,6 @@
 
         function saveSettings() {
             localStorage.setItem(TIMEZONE_STORAGE, document.getElementById('timezone').value);
-        }
-
-        function toggleTheme() {
-            const isDark = document.documentElement.style.colorScheme === 'dark';
-            document.documentElement.style.colorScheme = isDark ? 'light' : 'dark';
-            document.getElementById('themeToggle').textContent = isDark ? '🌙' : '☀️';
         }
 
         function loadAllWeeksData() {
@@ -761,16 +742,16 @@
             document.getElementById('weekHeader').textContent = `Week ${weekNum} (${dateStr})`;
             document.getElementById('weekSubheader').textContent = `Completed: ${units}/${target}`;
 
-            // Update squares with banking visualization
+            // Update squares with banking visualization - BANKED FIRST, then COMPLETED
             for (let i = 1; i <= 40; i++) {
                 const sq = document.querySelector(`.tracker-square[data-unit="${i}"]`);
                 if (sq) {
                     sq.classList.remove('filled', 'banked');
-                    if (i <= filledCount) {
-                        sq.classList.add('filled');
-                        sq.style.transitionDelay = `${(i - 1) * 0.05}s`;
-                    } else if (i <= filledCount + bankedFromPrevious && bankedFromPrevious > 0) {
+                    if (i <= bankedFromPrevious) {
                         sq.classList.add('banked');
+                        sq.style.transitionDelay = `${(i - 1) * 0.05}s`;
+                    } else if (i <= bankedFromPrevious + filledCount) {
+                        sq.classList.add('filled');
                         sq.style.transitionDelay = `${(i - 1) * 0.05}s`;
                     }
                 }
@@ -813,64 +794,4 @@
                 const completedPct = (units / target) * 100;
                 const bankedPct = (bankedForNext / target) * 100;
                 document.getElementById('progressCompletedBar').style.width = `${Math.min(completedPct, 100)}%`;
-                document.getElementById('progressCompletedLabel').textContent = `${units}/${target}`;
-                document.getElementById('progressBankedBar').style.width = `${Math.min(bankedPct, 100)}%`;
-                document.getElementById('progressBankedLabel').textContent = `${bankedForNext}`;
-            } else {
-                progressSection.style.display = 'none';
-            }
-        }
-
-        function updateSparkline() {
-            const bars = document.querySelectorAll('.sparkline-bar');
-            const last8Weeks = [];
-            
-            for (let i = 7; i >= 0; i--) {
-                const weekNum = getWeekNumber() - i;
-                const weekKey = `week_${weekNum}`;
-                const completed = allWeeksData[weekKey] ? allWeeksData[weekKey].completed : 0;
-                last8Weeks.push(completed);
-            }
-
-            const maxCompleted = Math.max(...last8Weeks, 40);
-            
-            bars.forEach((bar, idx) => {
-                const height = (last8Weeks[idx] / maxCompleted) * 100;
-                bar.style.height = `${Math.max(height, 5)}%`;
-            });
-        }
-
-        function updateLastUpdated() {
-            const now = new Date();
-            const time = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-            const lastUpdated = document.getElementById('lastUpdated');
-            if (lastUpdated) {
-                lastUpdated.textContent = `Last updated: ${time}`;
-            }
-        }
-
-        function exportCSV() {
-            const units = document.getElementById('weekSubheader').textContent;
-            const tz = document.getElementById('timezone').value;
-            const date = new Date().toISOString().split('T')[0];
-            const csv = `data:text/csv;charset=utf-8,Date,Units,Timezone\n${date},${units},${tz}`;
-            const link = document.createElement('a');
-            link.href = encodeURI(csv);
-            link.download = `focusmate-${date}.csv`;
-            link.click();
-        }
-
-        function showSuccess(msg) {
-            const container = document.getElementById('messageContainer');
-            container.innerHTML = `<div class="success-message">${msg}</div>`;
-            setTimeout(() => { container.innerHTML = ''; }, 3000);
-        }
-
-        function showError(msg) {
-            const container = document.getElementById('messageContainer');
-            container.innerHTML = `<div class="error-message">${msg}</div>`;
-            setTimeout(() => { container.innerHTML = ''; }, 5000);
-        }
-    </script>
-</body>
-</html>
+                document.getElementById('progress
