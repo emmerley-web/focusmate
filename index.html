@@ -330,6 +330,11 @@
             border-color: var(--color-primary);
         }
 
+        .goal-input:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
         .controls-section {
             margin-top: 24px;
         }
@@ -588,4 +593,369 @@
             ];
 
             container.innerHTML = goals.map((goal, idx) => `
-                <label class="goal
+                <label class="goal-row">
+                    <input type="checkbox" class="goal-checkbox" data-goal-index="${idx}" ${goal.done ? 'checked' : ''} />
+                    <input type="text" class="goal-input" data-goal-index="${idx}" placeholder="Add a goal..." value="${goal.text}" />
+                </label>
+            `).join('');
+
+            container.querySelectorAll('.goal-checkbox').forEach(checkbox => {
+                checkbox.addEventListener('change', saveWeeklyGoals);
+            });
+            container.querySelectorAll('.goal-input').forEach(input => {
+                input.addEventListener('blur', saveWeeklyGoals);
+            });
+        }
+
+        function saveWeeklyGoals() {
+            const weekNum = getWeekNumber();
+            const weekKey = `week_${weekNum}`;
+            const goals = [];
+
+            document.querySelectorAll('.goal-row').forEach((row, idx) => {
+                const checkbox = row.querySelector('.goal-checkbox');
+                const input = row.querySelector('.goal-input');
+                goals.push({
+                    text: input.value,
+                    done: checkbox.checked
+                });
+            });
+
+            allWeeklyGoals[weekKey] = goals;
+            localStorage.setItem(WEEKLY_GOALS_STORAGE, JSON.stringify(allWeeklyGoals));
+        }
+
+        function loadAllWeeklyGoals() {
+            const stored = localStorage.getItem(WEEKLY_GOALS_STORAGE);
+            if (stored) {
+                try {
+                    allWeeklyGoals = JSON.parse(stored);
+                } catch (e) {
+                    allWeeklyGoals = {};
+                }
+            }
+        }
+
+        function attachEventListeners() {
+            const refreshBtn = document.getElementById('refreshBtn');
+            const exportBtn = document.getElementById('exportBtn');
+            const timezone = document.getElementById('timezone');
+            const holidayToggle = document.getElementById('holidayToggle');
+            const customTarget = document.getElementById('customTarget');
+            const prevWeekBtn = document.getElementById('prevWeekBtn');
+            const nextWeekBtn = document.getElementById('nextWeekBtn');
+            
+            if (refreshBtn) refreshBtn.onclick = fetchSessions;
+            if (exportBtn) exportBtn.onclick = exportCSV;
+            if (timezone) timezone.onchange = saveSettings;
+            if (holidayToggle) {
+                holidayToggle.onchange = function() {
+                    saveSettings();
+                    const group = document.getElementById('customTargetGroup');
+                    if (group) {
+                        group.style.display = this.checked ? 'block' : 'none';
+                    }
+                };
+            }
+            if (customTarget) customTarget.onchange = saveSettings;
+            if (prevWeekBtn) prevWeekBtn.onclick = goToPreviousWeek;
+            if (nextWeekBtn) nextWeekBtn.onclick = goToNextWeek;
+        }
+
+        function loadSettings() {
+            const tz = localStorage.getItem(TIMEZONE_STORAGE) || 'Asia/Bangkok';
+            document.getElementById('timezone').value = tz;
+        }
+
+        function saveSettings() {
+            localStorage.setItem(TIMEZONE_STORAGE, document.getElementById('timezone').value);
+        }
+
+        function loadAllWeeksData() {
+            const stored = localStorage.getItem(WEEKS_STORAGE);
+            if (stored) {
+                try {
+                    allWeeksData = JSON.parse(stored);
+                } catch (e) {
+                    allWeeksData = {};
+                }
+            }
+        }
+
+        function saveAllWeeksData() {
+            localStorage.setItem(WEEKS_STORAGE, JSON.stringify(allWeeksData));
+        }
+
+        function getWeekNumber() {
+            const weekStart = new Date('2026-01-05');
+            const now = new Date();
+            const diffTime = now - weekStart;
+            const diffWeeks = Math.floor(diffTime / (7 * 24 * 60 * 60 * 1000));
+            return Math.max(1, diffWeeks + 1);
+        }
+
+        function getWeekData(timezone, weekOffset = 0) {
+            const currentWeekNum = getWeekNumber();
+            const targetWeekNum = currentWeekNum - weekOffset;
+            
+            const weekStart = new Date('2026-01-05');
+            weekStart.setDate(weekStart.getDate() + (targetWeekNum - 1) * 7);
+            weekStart.setHours(0, 0, 0, 0);
+            
+            return { weekStart, weekNum: targetWeekNum };
+        }
+
+        function goToPreviousWeek() {
+            currentViewingWeekOffset++;
+            const maxOffset = getWeekNumber() - 1;
+            if (currentViewingWeekOffset > maxOffset) {
+                currentViewingWeekOffset = maxOffset;
+                return;
+            }
+            updateHistoricalView();
+        }
+
+        function goToNextWeek() {
+            currentViewingWeekOffset--;
+            if (currentViewingWeekOffset < 0) {
+                currentViewingWeekOffset = 0;
+            }
+            updateHistoricalView();
+        }
+
+        function updateHistoricalView() {
+            const timezone = document.getElementById('timezone').value;
+            const isCurrentWeek = currentViewingWeekOffset === 0;
+            const { weekNum } = getWeekData(timezone, currentViewingWeekOffset);
+            
+            const maxOffset = getWeekNumber() - 1;
+            document.getElementById('prevWeekBtn').disabled = currentViewingWeekOffset >= maxOffset;
+            document.getElementById('nextWeekBtn').style.display = isCurrentWeek ? 'none' : 'block';
+
+            if (isCurrentWeek) {
+                fetchSessions();
+                generateWeeklyGoals();
+            } else {
+                const weekKey = `week_${weekNum}`;
+                if (allWeeksData[weekKey]) {
+                    const data = allWeeksData[weekKey];
+                    updateUIFromHistory(data, weekNum, data.target);
+                } else {
+                    showError(`No data for Week ${weekNum}`);
+                }
+            }
+        }
+
+        async function fetchSessions() {
+            if (currentViewingWeekOffset !== 0) return;
+
+            const timezone = document.getElementById('timezone').value;
+            const isCustom = document.getElementById('holidayToggle').checked;
+            const customTarget = Math.max(1, Math.min(40, parseInt(document.getElementById('customTarget').value) || 40));
+            const targetUnits = isCustom ? customTarget : 40;
+
+            try {
+                const weekData = getWeekData(timezone);
+                const startDate = weekData.weekStart.toISOString();
+                const endDate = new Date(weekData.weekStart.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+                const response = await fetch(
+                    `/api/focusmate?start=${encodeURIComponent(startDate)}&end=${encodeURIComponent(endDate)}`
+                );
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || `API returned ${response.status}`);
+                }
+
+                const data = await response.json();
+                
+                if (!data.sessions || data.sessions.length === 0) {
+                    processSessionData([], timezone, targetUnits, weekData.weekNum);
+                    updateLastUpdated();
+                    return;
+                }
+
+                const filteredSessions = data.sessions.filter(s => s.users && s.users.length >= 2);
+
+                processSessionData(filteredSessions, timezone, targetUnits, weekData.weekNum);
+                showSuccess(`Loaded ${filteredSessions.length} sessions`);
+                updateLastUpdated();
+            } catch (error) {
+                console.error('Fetch error:', error);
+                showError(`API Error: ${error.message}`);
+                updateLastUpdated();
+            }
+        }
+
+        function processSessionData(sessions, timezone, targetUnits, weekNum) {
+            const weekData = getWeekData(timezone);
+            let totalUnits = 0;
+            let dailyUnits = { Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0, Sun: 0 };
+
+            sessions.forEach(session => {
+                if (session.startTime && session.duration) {
+                    const sessionDate = new Date(session.startTime);
+                    const diff = Math.floor((sessionDate - weekData.weekStart) / (1000 * 60 * 60 * 24));
+                    if (diff >= 0 && diff < 7) {
+                        const durationMinutes = session.duration / (1000 * 60);
+                        const units = Math.round(durationMinutes / 25);
+                        const dayName = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][diff];
+                        if (dayName) {
+                            dailyUnits[dayName] += units;
+                            totalUnits += units;
+                        }
+                    }
+                }
+            });
+
+            const prevWeekKey = `week_${weekNum - 1}`;
+            const bankedFromPrevious = allWeeksData[prevWeekKey] ? allWeeksData[prevWeekKey].bankedForNextWeek : 0;
+            const unitsNeeded = Math.max(0, targetUnits - bankedFromPrevious);
+            const surplus = Math.max(0, totalUnits - unitsNeeded);
+            const bankedForNext = bankedFromPrevious + surplus;
+
+            const weekKey = `week_${weekNum}`;
+            allWeeksData[weekKey] = {
+                weekNum,
+                weekStart: weekData.weekStart.toISOString(),
+                completed: totalUnits,
+                target: targetUnits,
+                dailyUnits,
+                bankedFromPrevious,
+                surplus,
+                bankedForNextWeek: bankedForNext
+            };
+            saveAllWeeksData();
+
+            updateUI(totalUnits, targetUnits, dailyUnits, weekNum, bankedFromPrevious, bankedForNext);
+            updateSparkline();
+        }
+
+        function updateUIFromHistory(weekData, weekNum, targetUnits) {
+            updateUI(weekData.completed, targetUnits, weekData.dailyUnits, weekNum, weekData.bankedFromPrevious, weekData.bankedForNextWeek);
+        }
+
+        function updateUI(units, target, dailyUnits, weekNum, bankedFromPrevious = 0, bankedForNext = 0) {
+            const unitsNeeded = Math.max(0, target - bankedFromPrevious);
+            const filledCount = Math.min(units, target);
+            const totalDisplayed = bankedFromPrevious + units;
+
+            const weekStart = new Date('2026-01-05');
+            weekStart.setDate(weekStart.getDate() + (weekNum - 1) * 7);
+            const weekEnd = new Date(weekStart);
+            weekEnd.setDate(weekEnd.getDate() + 6);
+            const dateStr = `${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}-${weekEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+            
+            document.getElementById('weekHeader').textContent = `Week ${weekNum} (${dateStr})`;
+            document.getElementById('weekSubheader').textContent = `Completed: ${totalDisplayed}/${target}`;
+
+            for (let i = 1; i <= 40; i++) {
+                const sq = document.querySelector(`.tracker-square[data-unit="${i}"]`);
+                if (sq) {
+                    sq.classList.remove('filled', 'banked');
+                    if (i <= bankedFromPrevious) {
+                        sq.classList.add('banked');
+                        sq.style.transitionDelay = `${(i - 1) * 0.05}s`;
+                    } else if (i <= bankedFromPrevious + filledCount) {
+                        sq.classList.add('filled');
+                        sq.style.transitionDelay = `${(i - 1) * 0.05}s`;
+                    }
+                }
+            }
+
+            const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+            days.forEach(day => {
+                const dayU = dailyUnits[day] || 0;
+                const pct = Math.min((dayU / 8) * 100, 100);
+                const barFill = document.querySelector(`.day-bar-fill[data-day="${day}"]`);
+                const dayText = document.querySelector(`.day-units[data-day="${day}"]`);
+                if (barFill) barFill.style.height = `${pct}%`;
+                if (dayText) dayText.textContent = dayU;
+            });
+
+            const pct = (totalDisplayed / target) * 100;
+            const icon = document.getElementById('statusIcon');
+            const text = document.getElementById('statusText');
+            if (pct >= 100) {
+                icon.textContent = '🟢';
+                text.textContent = 'Complete! 🎉';
+            } else if (pct >= 80) {
+                icon.textContent = '🟢';
+                text.textContent = 'On track! 🎉';
+            } else if (pct >= 40) {
+                icon.textContent = '🟡';
+                text.textContent = 'Getting there 💪';
+            } else {
+                icon.textContent = '🔴';
+                text.textContent = 'Keep going 🚀';
+            }
+
+            const surplus = Math.max(0, units - unitsNeeded);
+            const progressSection = document.getElementById('progressSection');
+            if (surplus > 0 && currentViewingWeekOffset === 0) {
+                progressSection.style.display = 'block';
+                const completedPct = (totalDisplayed / target) * 100;
+                const bankedPct = (bankedForNext / target) * 100;
+                document.getElementById('progressCompletedBar').style.width = `${Math.min(completedPct, 100)}%`;
+                document.getElementById('progressCompletedLabel').textContent = `${totalDisplayed}/${target}`;
+                document.getElementById('progressBankedBar').style.width = `${Math.min(bankedPct, 100)}%`;
+                document.getElementById('progressBankedLabel').textContent = `${bankedForNext}`;
+            } else {
+                progressSection.style.display = 'none';
+            }
+        }
+
+        function updateSparkline() {
+            const bars = document.querySelectorAll('.sparkline-bar');
+            const last8Weeks = [];
+            
+            for (let i = 7; i >= 0; i--) {
+                const weekNum = getWeekNumber() - i;
+                const weekKey = `week_${weekNum}`;
+                const completed = allWeeksData[weekKey] ? allWeeksData[weekKey].completed : 0;
+                last8Weeks.push(completed);
+            }
+
+            const maxCompleted = Math.max(...last8Weeks, 40);
+            
+            bars.forEach((bar, idx) => {
+                const height = (last8Weeks[idx] / maxCompleted) * 100;
+                bar.style.height = `${Math.max(height, 5)}%`;
+            });
+        }
+
+        function updateLastUpdated() {
+            const now = new Date();
+            const time = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+            const lastUpdated = document.getElementById('lastUpdated');
+            if (lastUpdated) {
+                lastUpdated.textContent = `Last updated: ${time}`;
+            }
+        }
+
+        function exportCSV() {
+            const units = document.getElementById('weekSubheader').textContent;
+            const tz = document.getElementById('timezone').value;
+            const date = new Date().toISOString().split('T')[0];
+            const csv = `data:text/csv;charset=utf-8,Date,Units,Timezone\n${date},${units},${tz}`;
+            const link = document.createElement('a');
+            link.href = encodeURI(csv);
+            link.download = `focusmate-${date}.csv`;
+            link.click();
+        }
+
+        function showSuccess(msg) {
+            const container = document.getElementById('messageContainer');
+            container.innerHTML = `<div class="success-message">${msg}</div>`;
+            setTimeout(() => { container.innerHTML = ''; }, 3000);
+        }
+
+        function showError(msg) {
+            const container = document.getElementById('messageContainer');
+            container.innerHTML = `<div class="error-message">${msg}</div>`;
+            setTimeout(() => { container.innerHTML = ''; }, 5000);
+        }
+    </script>
+</body>
+</html>
