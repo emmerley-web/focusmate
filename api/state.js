@@ -6,11 +6,11 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  const REDIS_URL = process.env.REDIS_URL;
+  const redisUrl = process.env.REDIS_URL;
 
   try {
     if (req.method === 'GET') {
-      const response = await fetch(`${REDIS_URL}/get/focusmate-state`);
+      const response = await fetch(`${redisUrl}?cmd=GET%20focusmate-state`);
       const data = await response.json();
       return res.status(200).json(data?.result || {});
     }
@@ -29,11 +29,7 @@ export default async function handler(req, res) {
         lastModified: new Date().toISOString(),
       });
 
-      const response = await fetch(`${REDIS_URL}/set/focusmate-state`, {
-        method: 'POST',
-        body: stateData,
-      });
-
+      await fetch(`${redisUrl}?cmd=SET%20focusmate-state%20${encodeURIComponent(stateData)}`);
       return res.status(200).json({ success: true });
     }
 
