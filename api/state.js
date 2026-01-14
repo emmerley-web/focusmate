@@ -6,11 +6,15 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  const redisUrl = process.env.REDIS_URL;
-
   try {
+    const redisUrl = new URL(process.env.REDIS_URL);
+    const baseUrl = `${redisUrl.protocol}//${redisUrl.host}`;
+    const auth = Buffer.from(`${redisUrl.username}:${redisUrl.password}`).toString('base64');
+
     if (req.method === 'GET') {
-      const response = await fetch(`${redisUrl}?cmd=GET%20focusmate-state`);
+      const response = await fetch(`${baseUrl}/get/focusmate-state`, {
+        headers: { 'Authorization': `Basic ${auth}` }
+      });
       const data = await response.json();
       return res.status(200).json(data?.result || {});
     }
@@ -22,14 +26,22 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Missing fields' });
       }
 
-      const stateData = JSON.stringify({
+      const stateData = {
         currentWeek,
         banked: banked || 0,
         goals,
         lastModified: new Date().toISOString(),
+      };
+
+      const response = await fetch(`${baseUrl}/set/focusmate-state`, {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Basic ${auth}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(stateData)
       });
 
-      await fetch(`${redisUrl}?cmd=SET%20focusmate-state%20${encodeURIComponent(stateData)}`);
       return res.status(200).json({ success: true });
     }
 
