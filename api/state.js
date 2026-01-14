@@ -1,3 +1,5 @@
+import { put, get } from '@vercel/blob';
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -6,20 +8,16 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  const REDIS_URL = process.env.REDIS_URL;
-
   try {
     if (req.method === 'GET') {
-      const response = await fetch('https://redis-12350.c261.us-east-1-4.ec2.cloud.redislabs.com:12350', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: 'GET focusmate-state',
-      });
-      
-      const text = await response.text();
-      return res.status(200).json({ result: text });
+      try {
+        const blob = await get('focusmate-state.json');
+        const state = JSON.parse(blob.text);
+        return res.status(200).json(state);
+      } catch (error) {
+        // File doesn't exist yet
+        return res.status(200).json({});
+      }
     }
 
     if (req.method === 'POST') {
@@ -29,19 +27,23 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Missing fields' });
       }
 
-      const stateData = JSON.stringify({
+      const stateData = {
         currentWeek,
         banked: banked || 0,
         goals,
         lastModified: new Date().toISOString(),
+      };
+
+      await put('focusmate-state.json', JSON.stringify(stateData), {
+        access: 'public',
       });
 
-      await fetch('https://redis-12350.c261.us-east-1-4.ec2.cloud.redislabs.com:12350', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: `SET focusmate-state ${stateData}`,
-      });
+      return res.status(200).json({ success: true });
+    }
 
-      return res.status(2
+    return res.status(405).json({ error: 'Method not allowed' });
+  } catch (error) {
+    console.error('Error:', error);
+    return res.status(500).json({ error: error.message });
+  }
+}
