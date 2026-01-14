@@ -1,34 +1,39 @@
 import { kv } from '@vercel/kv';
 
-export const runtime = 'edge';
+export default async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
 
-export async function GET() {
-  try {
-    const state = await kv.get('focusmate-state');
-    return Response.json(state || {});
-  } catch (error) {
-    return Response.json({ error: 'Failed to load state' }, { status: 500 });
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
   }
-}
 
-export async function POST(request) {
   try {
-    const body = await request.json();
-    const { currentWeek, banked, goals, lastModified } = body;
-    
-    if (!currentWeek || !goals) {
-      return Response.json({ error: 'Missing required fields' }, { status: 400 });
+    if (req.method === 'GET') {
+      const state = await kv.get('focusmate-state');
+      return res.status(200).json(state || {});
     }
 
-    await kv.set('focusmate-state', {
-      currentWeek,
-      banked: banked || 0,
-      goals,
-      lastModified: new Date().toISOString(),
-    });
+    if (req.method === 'POST') {
+      const { currentWeek, banked, goals } = req.body;
+      
+      if (!currentWeek || !goals) {
+        return res.status(400).json({ error: 'Missing fields' });
+      }
 
-    return Response.json({ success: true });
+      await kv.set('focusmate-state', {
+        currentWeek,
+        banked: banked || 0,
+        goals,
+        lastModified: new Date().toISOString(),
+      });
+
+      return res.status(200).json({ success: true });
+    }
+
+    return res.status(405).json({ error: 'Method not allowed' });
   } catch (error) {
-    return Response.json({ error: 'Failed to save state' }, { status: 500 });
+    console.error('Error:', error);
+    return res.status(500).json({ error: error.message });
   }
 }
