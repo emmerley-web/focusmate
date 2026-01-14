@@ -1,4 +1,8 @@
-import { kv } from '@vercel/kv';
+import { Redis } from '@upstash/redis';
+
+const redis = new Redis({
+  url: process.env.REDIS_URL,
+});
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -10,7 +14,7 @@ export default async function handler(req, res) {
 
   try {
     if (req.method === 'GET') {
-      const state = await kv.get('focusmate-state');
+      const state = await redis.get('focusmate-state');
       return res.status(200).json(state || {});
     }
 
@@ -21,7 +25,7 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Missing fields' });
       }
 
-      await kv.set('focusmate-state', {
+      await redis.set('focusmate-state', {
         currentWeek,
         banked: banked || 0,
         goals,
