@@ -6,17 +6,20 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  try {
-    const redisUrl = new URL(process.env.REDIS_URL);
-    const baseUrl = `${redisUrl.protocol}//${redisUrl.host}`;
-    const auth = Buffer.from(`${redisUrl.username}:${redisUrl.password}`).toString('base64');
+  const REDIS_URL = process.env.REDIS_URL;
 
+  try {
     if (req.method === 'GET') {
-      const response = await fetch(`${baseUrl}/get/focusmate-state`, {
-        headers: { 'Authorization': `Basic ${auth}` }
+      const response = await fetch('https://redis-12350.c261.us-east-1-4.ec2.cloud.redislabs.com:12350', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: 'GET focusmate-state',
       });
-      const data = await response.json();
-      return res.status(200).json(data?.result || {});
+      
+      const text = await response.text();
+      return res.status(200).json({ result: text });
     }
 
     if (req.method === 'POST') {
@@ -26,28 +29,19 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Missing fields' });
       }
 
-      const stateData = {
+      const stateData = JSON.stringify({
         currentWeek,
         banked: banked || 0,
         goals,
         lastModified: new Date().toISOString(),
-      };
-
-      const response = await fetch(`${baseUrl}/set/focusmate-state`, {
-        method: 'POST',
-        headers: { 
-          'Authorization': `Basic ${auth}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(stateData)
       });
 
-      return res.status(200).json({ success: true });
-    }
+      await fetch('https://redis-12350.c261.us-east-1-4.ec2.cloud.redislabs.com:12350', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `SET focusmate-state ${stateData}`,
+      });
 
-    return res.status(405).json({ error: 'Method not allowed' });
-  } catch (error) {
-    console.error('Error:', error);
-    return res.status(500).json({ error: error.message });
-  }
-}
+      return res.status(2
