@@ -1,9 +1,3 @@
-import { Redis } from '@upstash/redis';
-
-const redis = new Redis({
-  url: process.env.REDIS_URL,
-});
-
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -12,10 +6,13 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
+  const REDIS_URL = process.env.REDIS_URL;
+
   try {
     if (req.method === 'GET') {
-      const state = await redis.get('focusmate-state');
-      return res.status(200).json(state || {});
+      const response = await fetch(`${REDIS_URL}/get/focusmate-state`);
+      const data = await response.json();
+      return res.status(200).json(data?.result || {});
     }
 
     if (req.method === 'POST') {
@@ -25,11 +22,16 @@ export default async function handler(req, res) {
         return res.status(400).json({ error: 'Missing fields' });
       }
 
-      await redis.set('focusmate-state', {
+      const stateData = JSON.stringify({
         currentWeek,
         banked: banked || 0,
         goals,
         lastModified: new Date().toISOString(),
+      });
+
+      const response = await fetch(`${REDIS_URL}/set/focusmate-state`, {
+        method: 'POST',
+        body: stateData,
       });
 
       return res.status(200).json({ success: true });
