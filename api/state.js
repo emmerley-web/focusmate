@@ -2,37 +2,24 @@ import { put, get } from '@vercel/blob';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, DEBUG');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
 
   try {
-    if (req.method === 'DEBUG') {
-      try {
-        const blob = await get('focusmate-state.json');
-        console.log('Blob type:', typeof blob);
-        console.log('Blob value:', blob);
-        console.log('Blob length:', blob.length);
-        return res.status(200).json({ 
-          blobType: typeof blob, 
-          blobLength: blob ? blob.length : 0,
-          blobPreview: blob ? blob.substring(0, 100) : 'EMPTY'
-        });
-      } catch (error) {
-        return res.status(200).json({ error: error.message });
-      }
-    }
-
     if (req.method === 'GET') {
       try {
         const blob = await get('focusmate-state.json');
+        // blob is a string, parse it directly
         const state = JSON.parse(blob);
+        console.log('Successfully loaded state:', state);
         return res.status(200).json(state);
       } catch (error) {
-        // File doesn't exist yet
-        return res.status(200).json({});
+        console.log('No state file found or parse error:', error.message);
+        // File doesn't exist yet, return empty state
+        return res.status(200).json({ allWeeksData: {}, allWeeklyGoals: {} });
       }
     }
 
