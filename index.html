@@ -583,7 +583,7 @@
 
         function generateTrackerGrid() {
             const grid = document.getElementById('trackerGrid');
-            grid.innerHTML = Array.from({ length: 40 }, (_, i) => 
+            grid.innerHTML = Array.from({ length: 40 }, (_, i) =>
                 `<div class="tracker-square" data-unit="${i + 1}"></div>`
             ).join('');
         }
@@ -604,7 +604,7 @@
 
         function generateSparkline() {
             const container = document.getElementById('sparkline');
-            container.innerHTML = Array.from({ length: 8 }, () => 
+            container.innerHTML = Array.from({ length: 8 }, () =>
                 `<div class="sparkline-bar" style="height: 50%;"></div>`
             ).join('');
         }
@@ -671,7 +671,7 @@
             const customTarget = document.getElementById('customTarget');
             const prevWeekBtn = document.getElementById('prevWeekBtn');
             const nextWeekBtn = document.getElementById('nextWeekBtn');
-            
+
             if (refreshBtn) refreshBtn.onclick = fetchSessions;
             if (exportBtn) exportBtn.onclick = exportCSV;
             if (timezone) timezone.onchange = saveSettings;
@@ -725,11 +725,11 @@
         function getWeekData(timezone, weekOffset = 0) {
             const currentWeekNum = getWeekNumber();
             const targetWeekNum = currentWeekNum - weekOffset;
-            
+
             const weekStart = new Date('2026-01-05');
             weekStart.setDate(weekStart.getDate() + (targetWeekNum - 1) * 7);
             weekStart.setHours(0, 0, 0, 0);
-            
+
             return { weekStart, weekNum: targetWeekNum };
         }
 
@@ -755,7 +755,7 @@
             const timezone = document.getElementById('timezone').value;
             const isCurrentWeek = currentViewingWeekOffset === 0;
             const { weekNum } = getWeekData(timezone, currentViewingWeekOffset);
-            
+
             const maxOffset = getWeekNumber() - 1;
             document.getElementById('prevWeekBtn').disabled = currentViewingWeekOffset >= maxOffset;
             document.getElementById('nextWeekBtn').style.display = isCurrentWeek ? 'none' : 'block';
@@ -797,7 +797,7 @@
                 }
 
                 const data = await response.json();
-                
+
                 if (!data.sessions || data.sessions.length === 0) {
                     processSessionData([], timezone, targetUnits, weekData.weekNum);
                     updateLastUpdated();
@@ -874,7 +874,7 @@
             const weekEnd = new Date(weekStart);
             weekEnd.setDate(weekEnd.getDate() + 6);
             const dateStr = `${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}-${weekEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
-            
+
             document.getElementById('weekHeader').textContent = `Week ${weekNum} (${dateStr})`;
             document.getElementById('weekSubheader').textContent = `Completed: ${totalDisplayed}/${target}`;
 
@@ -937,7 +937,7 @@
         function updateSparkline() {
             const bars = document.querySelectorAll('.sparkline-bar');
             const last8Weeks = [];
-            
+
             for (let i = 7; i >= 0; i--) {
                 const weekNum = getWeekNumber() - i;
                 const weekKey = `week_${weekNum}`;
@@ -946,7 +946,7 @@
             }
 
             const maxCompleted = Math.max(...last8Weeks, 40);
-            
+
             bars.forEach((bar, idx) => {
                 const height = (last8Weeks[idx] / maxCompleted) * 100;
                 bar.style.height = `${Math.max(height, 5)}%`;
@@ -988,35 +988,55 @@
         // ===== API SYNC FUNCTIONS =====
         async function loadStateFromAPI() {
             try {
+                console.log('🔍 Starting loadStateFromAPI');
+
                 const response = await fetch('/api/state');
+                console.log('🔍 /api/state response status:', response.status);
+
+                if (!response.ok) {
+                    throw new Error(`API returned ${response.status}`);
+                }
+
                 const state = await response.json();
-                
-                // Always fall back to localStorage if API returns empty or incomplete data
-                if (state && state.allWeeksData && Object.keys(state.allWeeksData).length > 0) {
-                    allWeeksData = state.allWeeksData;
-                    console.log('Loaded allWeeksData from API');
-                } else {
-                    loadAllWeeksData();
-                    console.log('Loaded allWeeksData from localStorage');
+                console.log('🔍 /api/state response:', state);
+                console.log('🔍 allWeeksData keys in response:', Object.keys(state.allWeeksData || {}));
+
+                // ALWAYS use API response as source of truth (even if empty)
+                // This ensures cross-device sync works
+                allWeeksData = state.allWeeksData || {};
+                allWeeklyGoals = state.allWeeklyGoals || {};
+
+                console.log('✅ Loaded from API - allWeeksData:', allWeeksData);
+                console.log('✅ Loaded from API - allWeeklyGoals:', allWeeklyGoals);
+
+                // If API response is empty, also load from localStorage as secondary source
+                if (Object.keys(allWeeksData).length === 0) {
+                    const localWeeks = localStorage.getItem(WEEKS_STORAGE);
+                    if (localWeeks) {
+                        try {
+                            allWeeksData = JSON.parse(localWeeks);
+                            console.log('📱 Also loaded allWeeksData from localStorage backup');
+                        } catch (e) {
+                            console.log('Could not parse localStorage weeks');
+                        }
+                    }
                 }
-                
-                if (state && state.allWeeklyGoals && Object.keys(state.allWeeklyGoals).length > 0) {
-                    allWeeklyGoals = state.allWeeklyGoals;
-                    console.log('Loaded allWeeklyGoals from API');
-                } else {
-                    loadAllWeeklyGoals();
-                    console.log('Loaded allWeeklyGoals from localStorage');
+
+                if (Object.keys(allWeeklyGoals).length === 0) {
+                    const localGoals = localStorage.getItem(WEEKLY_GOALS_STORAGE);
+                    if (localGoals) {
+                        try {
+                            allWeeklyGoals = JSON.parse(localGoals);
+                            console.log('📱 Also loaded allWeeklyGoals from localStorage backup');
+                        } catch (e) {
+                            console.log('Could not parse localStorage goals');
+                        }
+                    }
                 }
-                
-                // Render current week UI with loaded data (including banked hours)
-                const currentWeekNum = getWeekNumber();
-                const weekKey = `week_${currentWeekNum}`;
-                if (allWeeksData[weekKey]) {
-                    const data = allWeeksData[weekKey];
-                    updateUI(data.completed, data.target, data.dailyUnits, currentWeekNum, data.bankedFromPrevious, data.bankedForNextWeek);
-                }
+
             } catch (error) {
-                console.error('Failed to load from API, using localStorage:', error);
+                console.error('❌ Failed to load from API:', error);
+                console.log('Falling back to localStorage only');
                 loadAllWeeksData();
                 loadAllWeeklyGoals();
             }
@@ -1033,14 +1053,14 @@
                         lastModified: new Date().toISOString()
                     })
                 });
-                
+
                 if (!response.ok) {
                     throw new Error(`API error: ${response.status}`);
                 }
-                
-                console.log('State saved to API');
+
+                console.log('💾 State saved to API');
             } catch (error) {
-                console.error('Failed to save to API:', error);
+                console.error('❌ Failed to save to API:', error);
             }
         }
     </script>
