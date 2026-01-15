@@ -12,7 +12,7 @@ export default async function handler(req, res) {
     if (req.method === 'GET') {
       try {
         const blob = await get('focusmate-state.json');
-        const state = JSON.parse(blob.text);
+        const state = JSON.parse(blob);
         return res.status(200).json(state);
       } catch (error) {
         // File doesn't exist yet
