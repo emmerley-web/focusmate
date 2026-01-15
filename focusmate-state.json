@@ -23,7 +23,7 @@
     "week_2": [
       {
         "text": "hi there",
-        "done": true
+        "done": false
       },
       {
         "text": "",
@@ -35,5 +35,5 @@
       }
     ]
   },
-  "lastModified": "2026-01-15T16:13:37.877Z"
+  "lastModified": "2026-01-15T16:14:29.202Z"
 }
