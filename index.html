@@ -568,6 +568,7 @@
         let currentViewingWeekOffset = 0;
         let allWeeksData = {};
         let allWeeklyGoals = {};
+        let sessions = [];
 
         document.addEventListener('DOMContentLoaded', async () => {
             loadSettings();
@@ -806,6 +807,9 @@
 
                 const filteredSessions = data.sessions.filter(s => s.users && s.users.length >= 2);
 
+                // Save sessions to state for cross-device sync
+                sessions = filteredSessions;
+
                 processSessionData(filteredSessions, timezone, targetUnits, weekData.weekNum);
                 showSuccess(`Loaded ${filteredSessions.length} sessions`);
                 updateLastUpdated();
@@ -816,12 +820,12 @@
             }
         }
 
-        function processSessionData(sessions, timezone, targetUnits, weekNum) {
+        function processSessionData(sessionsData, timezone, targetUnits, weekNum) {
             const weekData = getWeekData(timezone);
             let totalUnits = 0;
             let dailyUnits = { Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0, Sun: 0 };
 
-            sessions.forEach(session => {
+            sessionsData.forEach(session => {
                 if (session.startTime && session.duration) {
                     const sessionDate = new Date(session.startTime);
                     const diff = Math.floor((sessionDate - weekData.weekStart) / (1000 * 60 * 60 * 24));
@@ -986,6 +990,83 @@
         }
 
         // ===== API SYNC FUNCTIONS =====
+        
+        function recalculateWeeksFromSessions() {
+            if (!sessions || sessions.length === 0) {
+                console.log('📊 No sessions to recalculate');
+                return;
+            }
+
+            console.log('🔄 Recalculating weeks from', sessions.length, 'sessions...');
+            const timezone = document.getElementById('timezone').value || 'Asia/Bangkok';
+            
+            // Clear old week data
+            const newWeeksData = {};
+            
+            sessions.forEach(session => {
+                if (session.startTime && session.duration) {
+                    const sessionDate = new Date(session.startTime);
+                    const weekStart = new Date('2026-01-05');
+                    const diff = Math.floor((sessionDate - weekStart) / (1000 * 60 * 60 * 24));
+                    const weekNum = Math.floor(diff / 7) + 1;
+                    
+                    if (weekNum >= 1) {
+                        const weekKey = `week_${weekNum}`;
+                        
+                        if (!newWeeksData[weekKey]) {
+                            newWeeksData[weekKey] = {
+                                weekNum,
+                                weekStart: new Date(weekStart.getTime() + (weekNum - 1) * 7 * 24 * 60 * 60 * 1000).toISOString(),
+                                completed: 0,
+                                target: 40,
+                                dailyUnits: { Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0, Sun: 0 },
+                                bankedFromPrevious: 0,
+                                surplus: 0,
+                                bankedForNextWeek: 0
+                            };
+                        }
+                        
+                        const durationMinutes = session.duration / (1000 * 60);
+                        const units = Math.round(durationMinutes / 25);
+                        const dayName = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][diff % 7];
+                        
+                        if (dayName) {
+                            newWeeksData[weekKey].dailyUnits[dayName] += units;
+                            newWeeksData[weekKey].completed += units;
+                        }
+                    }
+                }
+            });
+            
+            // Calculate banking for each week
+            const sortedWeeks = Object.keys(newWeeksData).sort((a, b) => {
+                const weekA = parseInt(a.split('_')[1]);
+                const weekB = parseInt(b.split('_')[1]);
+                return weekA - weekB;
+            });
+            
+            sortedWeeks.forEach((weekKey, idx) => {
+                const week = newWeeksData[weekKey];
+                const prevWeekKey = idx > 0 ? sortedWeeks[idx - 1] : null;
+                
+                if (prevWeekKey) {
+                    const prevWeek = newWeeksData[prevWeekKey];
+                    week.bankedFromPrevious = prevWeek.bankedForNextWeek;
+                } else {
+                    week.bankedFromPrevious = 0;
+                }
+                
+                const unitsNeeded = Math.max(0, week.target - week.bankedFromPrevious);
+                week.surplus = Math.max(0, week.completed - unitsNeeded);
+                week.bankedForNextWeek = week.bankedFromPrevious + week.surplus;
+            });
+            
+            // Merge with existing data (don't overwrite current week if it has manual entries)
+            allWeeksData = { ...newWeeksData, ...allWeeksData };
+            
+            console.log('✅ Recalculated', Object.keys(allWeeksData).length, 'weeks from sessions');
+        }
+
         async function loadStateFromAPI() {
             try {
                 console.log('🔍 Starting loadStateFromAPI');
@@ -1005,9 +1086,14 @@
                 // This ensures cross-device sync works
                 allWeeksData = state.allWeeksData || {};
                 allWeeklyGoals = state.allWeeklyGoals || {};
+                sessions = state.sessions || [];
 
                 console.log('✅ Loaded from API - allWeeksData:', allWeeksData);
                 console.log('✅ Loaded from API - allWeeklyGoals:', allWeeklyGoals);
+                console.log('✅ Loaded from API - sessions:', sessions.length, 'sessions');
+
+                // RECALCULATE WEEKS FROM SESSIONS
+                recalculateWeeksFromSessions();
 
                 // If API response is empty, also load from localStorage as secondary source
                 if (Object.keys(allWeeksData).length === 0) {
@@ -1050,6 +1136,7 @@
                     body: JSON.stringify({
                         allWeeksData,
                         allWeeklyGoals,
+                        sessions,
                         lastModified: new Date().toISOString()
                     })
                 });
