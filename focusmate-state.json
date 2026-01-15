@@ -1,0 +1,39 @@
+{
+  "allWeeksData": {
+    "week_2": {
+      "weekNum": 2,
+      "weekStart": "2026-01-11T17:00:00.000Z",
+      "completed": 27,
+      "target": 40,
+      "dailyUnits": {
+        "Mon": 5,
+        "Tue": 6,
+        "Wed": 8,
+        "Thu": 8,
+        "Fri": 0,
+        "Sat": 0,
+        "Sun": 0
+      },
+      "bankedFromPrevious": 0,
+      "surplus": 0,
+      "bankedForNextWeek": 0
+    }
+  },
+  "allWeeklyGoals": {
+    "week_2": [
+      {
+        "text": "hi there",
+        "done": true
+      },
+      {
+        "text": "",
+        "done": false
+      },
+      {
+        "text": "",
+        "done": false
+      }
+    ]
+  },
+  "lastModified": "2026-01-15T16:01:26.058Z"
+}
