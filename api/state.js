@@ -21,16 +21,15 @@ export default async function handler(req, res) {
     }
 
     if (req.method === 'POST') {
-      const { currentWeek, banked, goals } = req.body;
+      const { allWeeksData, allWeeklyGoals } = req.body;
       
-      if (!currentWeek || !goals) {
-        return res.status(400).json({ error: 'Missing fields' });
+      if (!allWeeksData || !allWeeklyGoals) {
+        return res.status(400).json({ error: 'Missing required fields' });
       }
 
       const stateData = {
-        currentWeek,
-        banked: banked || 0,
-        goals,
+        allWeeksData,
+        allWeeklyGoals,
         lastModified: new Date().toISOString(),
       };
 
