@@ -1,0 +1,8 @@
+{
+  "name": "focusmate-tracker",
+  "version": "1.0.0",
+  "description": "FocusMate session tracker with Vercel Blob storage",
+  "dependencies": {
+    "@vercel/blob": "^0.21.0"
+  }
+}
