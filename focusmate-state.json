@@ -1,23 +1,5 @@
 {
   "allWeeksData": {
-    "week_1": {
-      "weekNum": 1,
-      "weekStart": "2026-01-04T17:00:00.000Z",
-      "completed": 42,
-      "target": 40,
-      "dailyUnits": {
-        "Mon": 5,
-        "Tue": 4,
-        "Wed": 12,
-        "Thu": 5,
-        "Fri": 8,
-        "Sat": 5,
-        "Sun": 3
-      },
-      "bankedFromPrevious": 0,
-      "surplus": 2,
-      "bankedForNextWeek": 2
-    },
     "week_2": {
       "weekNum": 2,
       "weekStart": "2026-01-11T17:00:00.000Z",
@@ -32,15 +14,15 @@
         "Sat": 0,
         "Sun": 0
       },
-      "bankedFromPrevious": 2,
+      "bankedFromPrevious": 0,
       "surplus": 0,
-      "bankedForNextWeek": 2
+      "bankedForNextWeek": 0
     }
   },
   "allWeeklyGoals": {
     "week_2": [
       {
-        "text": "Elevator pitch",
+        "text": "hi there",
         "done": true
       },
       {
@@ -53,5 +35,5 @@
       }
     ]
   },
-  "lastModified": "2026-01-15T16:03:48.440Z"
+  "lastModified": "2026-01-15T16:04:20.446Z"
 }
