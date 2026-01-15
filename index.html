@@ -569,10 +569,9 @@
         let allWeeksData = {};
         let allWeeklyGoals = {};
 
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
             loadSettings();
-            loadAllWeeksData();
-            loadAllWeeklyGoals();
+            await loadStateFromAPI();
             generateTrackerGrid();
             generateDailyBars();
             generateSparkline();
@@ -650,6 +649,7 @@
 
             allWeeklyGoals[weekKey] = goals;
             localStorage.setItem(WEEKLY_GOALS_STORAGE, JSON.stringify(allWeeklyGoals));
+            saveStateToAPI();
         }
 
         function loadAllWeeklyGoals() {
@@ -711,6 +711,7 @@
 
         function saveAllWeeksData() {
             localStorage.setItem(WEEKS_STORAGE, JSON.stringify(allWeeksData));
+            saveStateToAPI();
         }
 
         function getWeekNumber() {
@@ -982,6 +983,48 @@
             const container = document.getElementById('messageContainer');
             container.innerHTML = `<div class="error-message">${msg}</div>`;
             setTimeout(() => { container.innerHTML = ''; }, 5000);
+        }
+
+        // ===== API SYNC FUNCTIONS =====
+        async function loadStateFromAPI() {
+            try {
+                const response = await fetch('/api/state');
+                const state = await response.json();
+                
+                if (state.allWeeksData) {
+                    allWeeksData = state.allWeeksData;
+                }
+                if (state.allWeeklyGoals) {
+                    allWeeklyGoals = state.allWeeklyGoals;
+                }
+                console.log('Loaded state from API');
+            } catch (error) {
+                console.error('Failed to load from API, using localStorage:', error);
+                loadAllWeeksData();
+                loadAllWeeklyGoals();
+            }
+        }
+
+        async function saveStateToAPI() {
+            try {
+                const response = await fetch('/api/state', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        allWeeksData,
+                        allWeeklyGoals,
+                        lastModified: new Date().toISOString()
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`API error: ${response.status}`);
+                }
+                
+                console.log('State saved to API');
+            } catch (error) {
+                console.error('Failed to save to API:', error);
+            }
         }
     </script>
 </body>
