@@ -2,13 +2,29 @@ import { put, get } from '@vercel/blob';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, DEBUG');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
   }
 
   try {
+    if (req.method === 'DEBUG') {
+      try {
+        const blob = await get('focusmate-state.json');
+        console.log('Blob type:', typeof blob);
+        console.log('Blob value:', blob);
+        console.log('Blob length:', blob.length);
+        return res.status(200).json({ 
+          blobType: typeof blob, 
+          blobLength: blob ? blob.length : 0,
+          blobPreview: blob ? blob.substring(0, 100) : 'EMPTY'
+        });
+      } catch (error) {
+        return res.status(200).json({ error: error.message });
+      }
+    }
+
     if (req.method === 'GET') {
       try {
         const blob = await get('focusmate-state.json');
