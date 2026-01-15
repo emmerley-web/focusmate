@@ -1,4 +1,8 @@
 {
+  "buildCommand": "true",
+  "installCommand": "npm install",
+  "outputDirectory": ".",
+  "framework": "static",
   "headers": [
     {
       "source": "/(.*)",
