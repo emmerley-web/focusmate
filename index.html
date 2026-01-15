@@ -991,13 +991,22 @@
                 const response = await fetch('/api/state');
                 const state = await response.json();
                 
-                if (state.allWeeksData) {
+                // Always fall back to localStorage if API returns empty or incomplete data
+                if (state && state.allWeeksData && Object.keys(state.allWeeksData).length > 0) {
                     allWeeksData = state.allWeeksData;
+                    console.log('Loaded allWeeksData from API');
+                } else {
+                    loadAllWeeksData();
+                    console.log('Loaded allWeeksData from localStorage');
                 }
-                if (state.allWeeklyGoals) {
+                
+                if (state && state.allWeeklyGoals && Object.keys(state.allWeeklyGoals).length > 0) {
                     allWeeklyGoals = state.allWeeklyGoals;
+                    console.log('Loaded allWeeklyGoals from API');
+                } else {
+                    loadAllWeeklyGoals();
+                    console.log('Loaded allWeeklyGoals from localStorage');
                 }
-                console.log('Loaded state from API');
             } catch (error) {
                 console.error('Failed to load from API, using localStorage:', error);
                 loadAllWeeksData();
