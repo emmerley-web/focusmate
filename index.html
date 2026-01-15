@@ -1007,6 +1007,14 @@
                     loadAllWeeklyGoals();
                     console.log('Loaded allWeeklyGoals from localStorage');
                 }
+                
+                // Render current week UI with loaded data (including banked hours)
+                const currentWeekNum = getWeekNumber();
+                const weekKey = `week_${currentWeekNum}`;
+                if (allWeeksData[weekKey]) {
+                    const data = allWeeksData[weekKey];
+                    updateUI(data.completed, data.target, data.dailyUnits, currentWeekNum, data.bankedFromPrevious, data.bankedForNextWeek);
+                }
             } catch (error) {
                 console.error('Failed to load from API, using localStorage:', error);
                 loadAllWeeksData();
