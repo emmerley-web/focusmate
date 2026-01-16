@@ -5,19 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FocusMate Tracker</title>
     <style>
-        :root {
-            --color-bg: #1f2121;
-            --color-surface: #262828;
-            --color-text: #fffdf9;
-            --color-text-secondary: #a7a9a9;
-            --color-primary: #32b8c6;
-            --color-primary-hover: #2da6b2;
-            --color-primary-light: rgba(50, 184, 198, 0.4);
-            --color-success: #34d399;
-            --color-danger: #ff5459;
-            --color-border: rgba(119, 124, 124, 0.3);
-        }
-
         * {
             margin: 0;
             padding: 0;
@@ -25,109 +12,105 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            background-color: var(--color-bg);
-            color: var(--color-text);
-            padding: 16px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
             min-height: 100vh;
+            padding: 20px;
         }
 
         .container {
-            max-width: 600px;
+            max-width: 900px;
             margin: 0 auto;
         }
 
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 32px;
-        }
-
-        .header h1 {
-            font-size: 28px;
-            font-weight: 600;
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
         }
 
         .card {
-            background-color: var(--color-surface);
-            border: 1px solid var(--color-border);
+            background: white;
             border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 20px;
+            padding: 25px;
+            margin-bottom: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            transition: transform 0.3s ease;
         }
 
-        .week-summary {
-            text-align: center;
-            margin-bottom: 24px;
+        .card:hover {
+            transform: translateY(-5px);
         }
 
         .week-header {
-            font-size: 20px;
-            font-weight: 700;
-            color: var(--color-primary);
-            margin-bottom: 6px;
+            text-align: center;
+            margin-bottom: 20px;
         }
 
-        .week-subheader {
-            font-size: 14px;
-            color: var(--color-text-secondary);
-            font-weight: 400;
+        .week-header h2 {
+            color: #2c3e50;
+            font-size: 1.8em;
+            margin-bottom: 5px;
+        }
+
+        .week-header p {
+            color: #7f8c8d;
+            font-size: 1.1em;
         }
 
         .tracker-grid {
             display: grid;
             grid-template-columns: repeat(10, 1fr);
-            gap: 6px;
-            margin: 24px 0;
-            padding: 16px 0;
+            gap: 8px;
+            margin: 20px 0;
         }
 
         .tracker-square {
             aspect-ratio: 1;
-            background-color: rgba(119, 124, 124, 0.2);
             border-radius: 8px;
-            border: 2px solid rgba(119, 124, 124, 0.3);
-            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            background: #ecf0f1;
+            border: 2px solid #bdc3c7;
+            cursor: pointer;
+            transition: all 0.3s ease;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 10px;
-            font-weight: 600;
-            cursor: default;
-            position: relative;
-            overflow: hidden;
+            font-weight: bold;
+            color: white;
+            font-size: 0.7em;
         }
 
         .tracker-square.filled {
-            background: linear-gradient(135deg, #32b8c6, #2da6b2);
-            border-color: #32b8c6;
-            color: #262828;
-            box-shadow: 0 0 12px rgba(50, 184, 198, 0.4);
-        }
-
-        .tracker-square.filled::after {
-            content: '✓';
-            font-weight: 700;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-color: #667eea;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            animation: fillIn 0.6s ease forwards;
         }
 
         .tracker-square.banked {
-            background: linear-gradient(135deg, rgba(50, 184, 198, 0.5), rgba(45, 166, 178, 0.5));
-            border-color: rgba(50, 184, 198, 0.6);
-            color: #262828;
-            box-shadow: 0 0 8px rgba(50, 184, 198, 0.2);
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            border-color: #f5576c;
+            box-shadow: 0 4px 15px rgba(245, 87, 108, 0.4);
         }
 
-        .tracker-square.banked::after {
-            content: '★';
-            font-weight: 700;
+        @keyframes fillIn {
+            from {
+                transform: scale(0.5);
+                opacity: 0;
+            }
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
         }
 
         .daily-bars {
             display: grid;
             grid-template-columns: repeat(7, 1fr);
-            gap: 8px;
-            margin: 24px 0;
+            gap: 12px;
+            margin: 25px 0;
         }
 
         .day-container {
@@ -135,429 +118,339 @@
         }
 
         .day-label {
-            font-size: 12px;
-            color: var(--color-text-secondary);
+            font-weight: bold;
+            color: #2c3e50;
             margin-bottom: 8px;
-            font-weight: 500;
+            font-size: 0.9em;
         }
 
         .day-bar {
-            background-color: rgba(119, 124, 124, 0.2);
-            border-radius: 8px;
-            height: 100px;
-            display: flex;
-            flex-direction: column;
-            justify-content: flex-end;
-            align-items: center;
-            padding-bottom: 4px;
+            height: 150px;
+            background: #ecf0f1;
+            border-radius: 6px;
             overflow: hidden;
+            position: relative;
+            border: 2px solid #bdc3c7;
         }
 
         .day-bar-fill {
-            background: linear-gradient(180deg, #2da6b2, #218089);
-            width: 100%;
-            border-radius: 8px 8px 0 0;
-            transition: height 0.3s ease-out;
+            height: 100%;
+            background: linear-gradient(to top, #667eea, #764ba2);
+            transition: height 0.5s ease;
+            border-radius: 4px;
             display: flex;
             align-items: flex-end;
             justify-content: center;
-            font-size: 11px;
-            font-weight: 600;
-            color: #262828;
-            min-height: 4px;
         }
 
         .day-units {
-            font-size: 12px;
-            font-weight: 600;
-            color: var(--color-text);
-            margin-top: 4px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-top: 8px;
+            font-size: 1.1em;
         }
 
         .status-section {
             text-align: center;
-            padding: 20px 0;
-            border-top: 1px solid var(--color-border);
-            border-bottom: 1px solid var(--color-border);
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 8px;
             margin: 20px 0;
+            color: white;
         }
 
-        .status-indicator {
-            font-size: 48px;
-            margin-bottom: 8px;
+        .status-icon {
+            font-size: 3em;
+            margin-bottom: 10px;
         }
 
         .status-text {
-            font-size: 18px;
-            font-weight: 600;
+            font-size: 1.5em;
+            font-weight: bold;
         }
 
         .progress-section {
             margin: 20px 0;
-            padding: 16px 0;
-            border-top: 1px solid var(--color-border);
-            border-bottom: 1px solid var(--color-border);
+            display: none;
         }
 
         .progress-bar-container {
-            margin-bottom: 16px;
-        }
-
-        .progress-bar-label {
-            font-size: 12px;
-            color: var(--color-text-secondary);
-            margin-bottom: 6px;
-            display: flex;
-            justify-content: space-between;
+            background: #ecf0f1;
+            height: 40px;
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 15px;
+            position: relative;
         }
 
         .progress-bar {
-            width: 100%;
-            height: 8px;
-            background-color: rgba(119, 124, 124, 0.2);
-            border-radius: 4px;
-            overflow: hidden;
-        }
-
-        .progress-bar-fill {
             height: 100%;
-            background: linear-gradient(90deg, #32b8c6, #2da6b2);
-            border-radius: 4px;
-            transition: width 0.3s ease-out;
-        }
-
-        .history-controls {
+            background: linear-gradient(to right, #667eea, #764ba2);
             display: flex;
+            align-items: center;
             justify-content: center;
-            gap: 12px;
-            margin: 20px 0;
-        }
-
-        .history-btn {
-            padding: 8px 16px;
-            background-color: rgba(119, 124, 124, 0.2);
-            border: 1px solid var(--color-border);
-            color: var(--color-text);
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 13px;
-            font-weight: 500;
-            transition: all 0.2s ease;
-        }
-
-        .history-btn:hover:not(:disabled) {
-            background-color: rgba(119, 124, 124, 0.3);
-        }
-
-        .history-btn:disabled {
-            opacity: 0.4;
-            cursor: not-allowed;
-        }
-
-        .sparkline-section {
-            margin: 20px 0;
-            padding: 16px 0;
-            border-top: 1px solid var(--color-border);
-        }
-
-        .sparkline-label {
-            font-size: 12px;
-            color: var(--color-text-secondary);
-            margin-bottom: 8px;
-            font-weight: 500;
+            color: white;
+            font-weight: bold;
+            transition: width 0.5s ease;
         }
 
         .sparkline {
             display: flex;
             align-items: flex-end;
-            justify-content: center;
             gap: 4px;
-            height: 40px;
+            height: 60px;
+            margin: 20px 0;
         }
 
         .sparkline-bar {
-            width: 6px;
-            background: linear-gradient(180deg, #32b8c6, #2da6b2);
-            border-radius: 2px;
-            min-height: 2px;
-            transition: all 0.3s ease;
-        }
-
-        .last-updated {
-            text-align: center;
-            font-size: 11px;
-            color: var(--color-text-secondary);
-            margin-top: 12px;
+            flex: 1;
+            background: linear-gradient(to top, #667eea, #764ba2);
+            border-radius: 3px;
+            transition: height 0.3s ease;
+            min-height: 5%;
         }
 
         .weekly-goals {
-            margin-top: 24px;
+            margin: 20px 0;
         }
 
-        .goals-help {
-            font-size: 13px;
-            color: var(--color-text-secondary);
-            margin-bottom: 16px;
+        .weekly-goals h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
         }
 
         .goal-row {
             display: flex;
             align-items: center;
-            gap: 12px;
-            margin-bottom: 16px;
+            margin-bottom: 12px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 6px;
+            border: 1px solid #ecf0f1;
         }
 
         .goal-checkbox {
-            width: 36px;
-            height: 36px;
+            width: 24px;
+            height: 24px;
+            margin-right: 12px;
             cursor: pointer;
-            flex-shrink: 0;
-            accent-color: var(--color-primary);
-            -webkit-appearance: none;
-            appearance: none;
-            border: 3px solid var(--color-border);
-            border-radius: 8px;
-            background-color: var(--color-bg);
-            transition: all 0.2s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .goal-checkbox:hover {
-            border-color: var(--color-primary);
-            background-color: rgba(50, 184, 198, 0.1);
-        }
-
-        .goal-checkbox:checked {
-            background-color: var(--color-primary);
-            border-color: var(--color-primary);
-        }
-
-        .goal-checkbox:checked::after {
-            content: '✓';
-            color: #262828;
-            font-weight: bold;
-            font-size: 20px;
+            accent-color: #667eea;
         }
 
         .goal-input {
             flex: 1;
-            padding: 10px 12px;
-            background-color: transparent;
             border: none;
-            border-bottom: 2px solid var(--color-border);
-            color: var(--color-text);
-            font-size: 16px;
-            font-family: inherit;
-            transition: border-color 0.2s ease;
-        }
-
-        .goal-input:focus {
+            background: transparent;
+            font-size: 1em;
+            padding: 5px;
+            color: #2c3e50;
             outline: none;
-            border-bottom-color: var(--color-primary);
         }
 
         .goal-input::placeholder {
-            color: var(--color-text-secondary);
+            color: #bdc3c7;
         }
 
-        .controls-section {
-            margin-top: 24px;
+        .settings {
+            margin-top: 30px;
         }
 
-        .control-group {
-            margin-bottom: 16px;
+        .settings h3 {
+            color: #2c3e50;
+            margin-bottom: 15px;
         }
 
-        .control-label {
-            font-size: 12px;
-            color: var(--color-text-secondary);
-            margin-bottom: 6px;
+        .setting-group {
+            margin-bottom: 15px;
+        }
+
+        .setting-group label {
             display: block;
+            color: #2c3e50;
             font-weight: 500;
+            margin-bottom: 8px;
         }
 
-        .control-input {
+        .setting-group select,
+        .setting-group input[type="number"] {
             width: 100%;
-            padding: 10px 12px;
-            background-color: var(--color-bg);
-            border: 1px solid var(--color-border);
-            border-radius: 8px;
-            color: var(--color-text);
-            font-size: 14px;
+            padding: 10px;
+            border: 2px solid #ecf0f1;
+            border-radius: 6px;
+            font-size: 1em;
+            color: #2c3e50;
         }
 
-        .checkbox-wrapper {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            cursor: pointer;
-            font-size: 14px;
-        }
-
-        .checkbox-wrapper input {
-            cursor: pointer;
+        .setting-group select:focus,
+        .setting-group input[type="number"]:focus {
+            border-color: #667eea;
+            outline: none;
         }
 
         .button-group {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 12px;
-            margin-top: 20px;
+            margin-top: 15px;
         }
 
-        .btn {
-            padding: 12px 16px;
+        button {
+            padding: 12px 24px;
             border: none;
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: 600;
+            border-radius: 6px;
+            font-size: 1em;
+            font-weight: bold;
             cursor: pointer;
-            transition: all 0.2s ease;
+            transition: all 0.3s ease;
         }
 
-        .btn-primary {
-            background-color: var(--color-primary);
-            color: #262828;
+        button.primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
         }
 
-        .btn-primary:hover {
-            background-color: var(--color-primary-hover);
+        button.primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
         }
 
-        .btn-secondary {
-            background-color: rgba(119, 124, 124, 0.2);
-            color: var(--color-text);
-            border: 1px solid var(--color-border);
+        button.secondary {
+            background: #ecf0f1;
+            color: #2c3e50;
+        }
+
+        button.secondary:hover {
+            background: #d5dbdb;
+        }
+
+        .nav-buttons {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            margin: 20px 0;
+        }
+
+        .message-container {
+            margin: 10px 0;
+            min-height: 30px;
         }
 
         .success-message {
-            background-color: rgba(52, 211, 153, 0.1);
-            border: 1px solid var(--color-success);
-            color: var(--color-success);
+            background: #d4edda;
+            color: #155724;
             padding: 12px 16px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            font-size: 14px;
+            border-radius: 6px;
+            border-left: 4px solid #28a745;
         }
 
         .error-message {
-            background-color: rgba(255, 84, 89, 0.1);
-            border: 1px solid #ff5459;
-            color: #ff5459;
+            background: #f8d7da;
+            color: #721c24;
             padding: 12px 16px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-            font-size: 14px;
+            border-radius: 6px;
+            border-left: 4px solid #f5576c;
         }
 
-        @media (prefers-color-scheme: light) {
-            :root {
-                --color-bg: #fcfcf9;
-                --color-surface: #fffff5;
-                --color-text: #134252;
-                --color-text-secondary: #626c71;
-                --color-primary: #218089;
-                --color-primary-hover: #1a6a73;
-            }
+        .last-updated {
+            text-align: center;
+            color: #7f8c8d;
+            font-size: 0.9em;
+            margin-top: 15px;
+        }
+
+        #customTargetGroup {
+            display: none;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="header">
-            <h1>FocusMate Tracker</h1>
-        </div>
+        <h1>🎯 FocusMate Tracker</h1>
 
-        <div id="messageContainer"></div>
-
+        <!-- Main Tracker Card -->
         <div class="card">
-            <div class="week-summary">
-                <div class="week-header" id="weekHeader">Week 1 (Jan 5-11)</div>
-                <div class="week-subheader" id="weekSubheader">Completed: 0/40</div>
+            <div class="week-header">
+                <h2 id="weekHeader">Week 2 (Jan 12-Jan 18)</h2>
+                <p id="weekSubheader">Completed: 30/40</p>
             </div>
 
-            <div class="tracker-grid" id="trackerGrid"></div>
+            <div id="trackerGrid" class="tracker-grid"></div>
 
             <div class="daily-bars" id="dailyBars"></div>
 
             <div class="status-section">
-                <div class="status-indicator" id="statusIcon">🔴</div>
-                <div class="status-text" id="statusText">Behind</div>
+                <div class="status-icon" id="statusIcon">🟡</div>
+                <div class="status-text" id="statusText">Getting there 💪</div>
             </div>
 
-            <div class="progress-section" id="progressSection" style="display: none;">
+            <div class="progress-section" id="progressSection">
                 <div class="progress-bar-container">
-                    <div class="progress-bar-label">
-                        <span>Completed</span>
+                    <div class="progress-bar" id="progressCompletedBar" style="width: 0%">
                         <span id="progressCompletedLabel">0/40</span>
                     </div>
-                    <div class="progress-bar">
-                        <div class="progress-bar-fill" id="progressCompletedBar" style="width: 0%"></div>
-                    </div>
                 </div>
                 <div class="progress-bar-container">
-                    <div class="progress-bar-label">
-                        <span>🏦 Banking for next week</span>
-                        <span id="progressBankedLabel">0</span>
-                    </div>
-                    <div class="progress-bar">
-                        <div class="progress-bar-fill" id="progressBankedBar" style="width: 0%; background: linear-gradient(90deg, rgba(50, 184, 198, 0.6), rgba(45, 166, 178, 0.6));"></div>
+                    <div class="progress-bar" id="progressBankedBar" style="width: 0%; background: linear-gradient(to right, #f093fb, #f5576c);">
+                        <span id="progressBankedLabel">Banked: 0</span>
                     </div>
                 </div>
             </div>
 
-            <div class="history-controls">
-                <button class="history-btn" id="prevWeekBtn">◀ Previous Week</button>
-                <button class="history-btn" id="nextWeekBtn" style="display: none;">Next Week ▶</button>
+            <div class="nav-buttons">
+                <button class="secondary" id="prevWeekBtn">← Previous Week</button>
+                <button class="secondary" id="nextWeekBtn" style="display: none;">Next Week →</button>
             </div>
 
-            <div class="sparkline-section">
-                <div class="sparkline-label">Last 8 weeks</div>
-                <div class="sparkline" id="sparkline"></div>
-            </div>
+            <p style="text-align: center; color: #7f8c8d; margin-top: 15px; font-size: 0.9em;">Last 8 weeks</p>
+            <div class="sparkline" id="sparkline"></div>
 
-            <div class="last-updated" id="lastUpdated">Loading...</div>
+            <div class="last-updated" id="lastUpdated">Last updated: --:-- --</div>
         </div>
 
-        <div class="card weekly-goals">
-            <h2 style="font-size: 18px; margin-bottom: 8px;">Weekly Focus (Top 3)</h2>
-            <p class="goals-help">Pick up to three hard things to move the week forward.</p>
-            <div id="weeklyGoalsList"></div>
-        </div>
-
-        <div class="card controls-section">
-            <h2 style="font-size: 18px; margin-bottom: 16px;">Settings</h2>
-
-            <div class="control-group">
-                <label class="control-label">Timezone</label>
-                <select class="control-input" id="timezone">
-                    <option value="Asia/Bangkok">Bangkok (ICT)</option>
-                    <option value="Asia/Hong_Kong">Hong Kong (HKT)</option>
-                    <option value="Europe/London">London (GMT)</option>
-                    <option value="America/New_York">New York (EST)</option>
-                    <option value="Asia/Tokyo">Tokyo (JST)</option>
-                </select>
-            </div>
-
-            <div class="control-group">
-                <label class="checkbox-wrapper">
-                    <input type="checkbox" id="holidayToggle" />
-                    <span>Custom target</span>
-                </label>
-            </div>
-
-            <div class="control-group" id="customTargetGroup" style="display: none;">
-                <label class="control-label">Target units</label>
-                <input type="number" class="control-input" id="customTarget" min="1" max="40" value="20" />
-            </div>
-
-            <div class="button-group">
-                <button class="btn btn-primary" id="refreshBtn">Refresh Data</button>
-                <button class="btn btn-secondary" id="exportBtn">Export CSV</button>
+        <!-- Weekly Goals Card -->
+        <div class="card">
+            <div class="weekly-goals">
+                <h3>📋 Weekly Focus (Top 3)</h3>
+                <p style="color: #7f8c8d; margin-bottom: 15px; font-size: 0.9em;">Pick up to three hard things to move the week forward.</p>
+                <div id="weeklyGoalsList"></div>
             </div>
         </div>
+
+        <!-- Settings Card -->
+        <div class="card">
+            <div class="settings">
+                <h3>⚙️ Settings</h3>
+                
+                <div class="setting-group">
+                    <label for="timezone">Timezone</label>
+                    <select id="timezone">
+                        <option value="Asia/Bangkok">Bangkok (ICT)</option>
+                        <option value="Europe/London">London (GMT/BST)</option>
+                        <option value="America/New_York">New York (EST/EDT)</option>
+                        <option value="America/Los_Angeles">Los Angeles (PST/PDT)</option>
+                        <option value="Australia/Sydney">Sydney (AEDT/AEST)</option>
+                    </select>
+                </div>
+
+                <div class="setting-group">
+                    <label>
+                        <input type="checkbox" id="holidayToggle"> Custom target
+                    </label>
+                    <div id="customTargetGroup">
+                        <label for="customTarget">Target units per week</label>
+                        <input type="number" id="customTarget" min="1" max="40" value="40">
+                    </div>
+                </div>
+
+                <div class="button-group">
+                    <button class="primary" id="refreshBtn">🔄 Refresh Data</button>
+                    <button class="secondary" id="exportBtn">📥 Export CSV</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Message Container -->
+        <div id="messageContainer" class="message-container"></div>
     </div>
 
     <script>
@@ -800,15 +693,16 @@
                 const data = await response.json();
 
                 if (!data.sessions || data.sessions.length === 0) {
-                    processSessionData([], timezone, targetUnits, weekData.weekNum);
+                    console.log('⚠️ No sessions from API - preserving existing week data');
+                    saveStateToAPI();
                     updateLastUpdated();
                     return;
                 }
 
                 const filteredSessions = data.sessions.filter(s => s.users && s.users.length >= 2);
 
-                // Save sessions to state for cross-device sync
                 sessions = filteredSessions;
+                console.log(`📊 Loaded ${filteredSessions.length} sessions from API`);
 
                 processSessionData(filteredSessions, timezone, targetUnits, weekData.weekNum);
                 showSuccess(`Loaded ${filteredSessions.length} sessions`);
@@ -817,6 +711,7 @@
                 console.error('Fetch error:', error);
                 showError(`API Error: ${error.message}`);
                 updateLastUpdated();
+                saveStateToAPI();
             }
         }
 
@@ -989,8 +884,6 @@
             setTimeout(() => { container.innerHTML = ''; }, 5000);
         }
 
-        // ===== API SYNC FUNCTIONS =====
-        
         function recalculateWeeksFromSessions() {
             if (!sessions || sessions.length === 0) {
                 console.log('📊 No sessions to recalculate');
@@ -1000,7 +893,6 @@
             console.log('🔄 Recalculating weeks from', sessions.length, 'sessions...');
             const timezone = document.getElementById('timezone').value || 'Asia/Bangkok';
             
-            // Clear old week data
             const newWeeksData = {};
             
             sessions.forEach(session => {
@@ -1038,7 +930,6 @@
                 }
             });
             
-            // Calculate banking for each week
             const sortedWeeks = Object.keys(newWeeksData).sort((a, b) => {
                 const weekA = parseInt(a.split('_')[1]);
                 const weekB = parseInt(b.split('_')[1]);
@@ -1061,7 +952,6 @@
                 week.bankedForNextWeek = week.bankedFromPrevious + week.surplus;
             });
             
-            // Merge with existing data (don't overwrite current week if it has manual entries)
             allWeeksData = { ...newWeeksData, ...allWeeksData };
             
             console.log('✅ Recalculated', Object.keys(allWeeksData).length, 'weeks from sessions');
@@ -1069,33 +959,35 @@
 
         async function loadStateFromAPI() {
             try {
-                console.log('🔍 Starting loadStateFromAPI');
+                console.log('🔍 Loading state from API...');
 
                 const response = await fetch('/api/state');
-                console.log('🔍 /api/state response status:', response.status);
+                console.log('📡 /api/state response status:', response.status);
 
                 if (!response.ok) {
                     throw new Error(`API returned ${response.status}`);
                 }
 
                 const state = await response.json();
-                console.log('🔍 /api/state response:', state);
-                console.log('🔍 allWeeksData keys in response:', Object.keys(state.allWeeksData || {}));
+                console.log('✅ Loaded from API:', {
+                    weeks: Object.keys(state.allWeeksData || {}),
+                    goals: Object.keys(state.allWeeklyGoals || {}),
+                    sessions: (state.sessions || []).length
+                });
 
-                // ALWAYS use API response as source of truth (even if empty)
-                // This ensures cross-device sync works
                 allWeeksData = state.allWeeksData || {};
                 allWeeklyGoals = state.allWeeklyGoals || {};
                 sessions = state.sessions || [];
 
-                console.log('✅ Loaded from API - allWeeksData:', allWeeksData);
-                console.log('✅ Loaded from API - allWeeklyGoals:', allWeeklyGoals);
-                console.log('✅ Loaded from API - sessions:', sessions.length, 'sessions');
+                console.log('✅ State loaded:', {
+                    weeksLoaded: Object.keys(allWeeksData),
+                    sessionCount: sessions.length
+                });
 
-                // RECALCULATE WEEKS FROM SESSIONS
-                recalculateWeeksFromSessions();
+                if (sessions.length > 0) {
+                    recalculateWeeksFromSessions();
+                }
 
-                // If API response is empty, also load from localStorage as secondary source
                 if (Object.keys(allWeeksData).length === 0) {
                     const localWeeks = localStorage.getItem(WEEKS_STORAGE);
                     if (localWeeks) {
