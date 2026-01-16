@@ -17,9 +17,15 @@ async function getStateFromGitHub() {
     });
 
     const content = Buffer.from(response.data.content, 'base64').toString('utf-8');
-    return JSON.parse(content);
+    const parsed = JSON.parse(content);
+    console.log('✅ Loaded from GitHub:', {
+      weeks: Object.keys(parsed.allWeeksData || {}),
+      sessions: (parsed.sessions || []).length
+    });
+    return parsed;
   } catch (error) {
     if (error.status === 404) {
+      console.log('⚠️ State file not found, returning empty state');
       return { 
         allWeeksData: {}, 
         allWeeklyGoals: {}, 
@@ -27,6 +33,7 @@ async function getStateFromGitHub() {
         lastModified: new Date().toISOString() 
       };
     }
+    console.error('❌ Error loading from GitHub:', error.message);
     throw error;
   }
 }
@@ -43,23 +50,32 @@ async function saveStateToGitHub(state) {
       sha = response.data.sha;
     } catch (error) {
       if (error.status !== 404) throw error;
+      console.log('📝 File doesn\'t exist yet, will create');
     }
 
     const content = JSON.stringify(state, null, 2);
     const encodedContent = Buffer.from(content).toString('base64');
 
-    await octokit.repos.createOrUpdateFileContents({
+    const response = await octokit.repos.createOrUpdateFileContents({
       owner: REPO_OWNER,
       repo: REPO_NAME,
       path: STATE_FILE,
-      message: '💾 Auto-save: FocusMate state updated',
+      message: `💾 Auto-save: FocusMate state updated - ${Object.keys(state.allWeeksData).length} weeks`,
       content: encodedContent,
       ...(sha && { sha })
     });
 
-    console.log('[POST] ✅ Saved to GitHub successfully');
+    console.log('✅ Saved to GitHub successfully');
+    console.log('📊 Saved state:', {
+      weeks: Object.keys(state.allWeeksData || {}),
+      goals: Object.keys(state.allWeeklyGoals || {}),
+      sessions: (state.sessions || []).length,
+      lastModified: state.lastModified
+    });
+    
+    return response;
   } catch (error) {
-    console.error('[POST] ❌ Failed to save to GitHub:', error.message);
+    console.error('❌ Failed to save to GitHub:', error.message);
     throw error;
   }
 }
@@ -75,22 +91,27 @@ module.exports = async function handler(req, res) {
 
   try {
     if (req.method === 'GET') {
-      console.log('🔍 GET /api/state');
+      console.log('🔍 [GET /api/state] Fetching state from GitHub');
       const state = await getStateFromGitHub();
-      console.log('✅ Returning state with', Object.keys(state.allWeeksData).length, 'weeks and', state.sessions?.length || 0, 'sessions');
       return res.status(200).json(state);
     }
 
     if (req.method === 'POST') {
-      console.log('🔍 POST /api/state');
+      console.log('🔍 [POST /api/state] Saving state to GitHub');
       const { allWeeksData, allWeeklyGoals, sessions } = req.body;
 
+      // Ensure sessions array is always included
       const state = {
         allWeeksData: allWeeksData || {},
         allWeeklyGoals: allWeeklyGoals || {},
-        sessions: sessions || [],
+        sessions: Array.isArray(sessions) ? sessions : [],
         lastModified: new Date().toISOString()
       };
+
+      console.log('📦 State to save:', {
+        weekKeys: Object.keys(state.allWeeksData),
+        sessionCount: state.sessions.length
+      });
 
       await saveStateToGitHub(state);
       return res.status(200).json({ success: true, message: 'State saved' });
