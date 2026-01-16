@@ -53,9 +53,18 @@ export default async function handler(req, res) {
         const blob = await get(BLOB_KEY);
         if (!blob) {
           console.log('📦 Blob empty, returning default state');
-          state = DEFAULT_STATE;
+          state = JSON.parse(JSON.stringify(DEFAULT_STATE));
+          state.lastModified = new Date().toISOString();
         } else {
-          state = JSON.parse(blob.toString());
+          // Handle both string and Buffer types
+          const blobString = typeof blob === 'string' ? blob : blob.toString();
+          state = JSON.parse(blobString);
+          
+          // Validate state structure
+          if (!state.allWeeksData) state.allWeeksData = {};
+          if (!state.allWeeklyGoals) state.allWeeklyGoals = {};
+          if (!state.sessions) state.sessions = [];
+          
           console.log('📦 Loaded from Blob:', {
             weeks: Object.keys(state.allWeeksData || {}),
             goals: Object.keys(state.allWeeklyGoals || {})
@@ -63,33 +72,60 @@ export default async function handler(req, res) {
         }
       } catch (error) {
         console.log('📦 Blob read failed, using default:', error.message);
-        state = DEFAULT_STATE;
+        state = JSON.parse(JSON.stringify(DEFAULT_STATE));
+        state.lastModified = new Date().toISOString();
       }
 
       return res.status(200).json(state);
     } else if (req.method === 'POST') {
-      // WRITE to Blob
-      const { allWeeksData, allWeeklyGoals, sessions, lastModified } = req.body;
+      // WRITE to Blob - FIX: Parse JSON body properly
+      let bodyData;
+      try {
+        // Handle both parsed object and string body
+        if (typeof req.body === 'string') {
+          bodyData = JSON.parse(req.body);
+        } else if (typeof req.body === 'object') {
+          bodyData = req.body;
+        } else {
+          throw new Error('Invalid body type');
+        }
+      } catch (parseError) {
+        console.error('❌ Failed to parse request body:', parseError.message);
+        return res.status(400).json({ 
+          error: 'Invalid JSON in request body',
+          details: parseError.message 
+        });
+      }
+
+      const { allWeeksData, allWeeklyGoals, sessions } = bodyData;
 
       const state = {
         allWeeksData: allWeeksData || {},
         allWeeklyGoals: allWeeklyGoals || {},
         sessions: sessions || [],
-        lastModified: lastModified || new Date().toISOString()
+        lastModified: new Date().toISOString()
       };
 
-      await put(BLOB_KEY, JSON.stringify(state, null, 2), {
-        access: 'public',
-        contentType: 'application/json'
-      });
+      try {
+        await put(BLOB_KEY, JSON.stringify(state, null, 2), {
+          access: 'public',
+          contentType: 'application/json'
+        });
 
-      console.log('💾 Saved to Blob:', {
-        weeks: Object.keys(state.allWeeksData),
-        goals: Object.keys(state.allWeeklyGoals),
-        sessions: state.sessions.length
-      });
+        console.log('💾 Saved to Blob:', {
+          weeks: Object.keys(state.allWeeksData),
+          goals: Object.keys(state.allWeeklyGoals),
+          sessions: state.sessions.length
+        });
 
-      return res.status(200).json({ success: true, state });
+        return res.status(200).json({ success: true, state });
+      } catch (blobError) {
+        console.error('❌ Failed to write to Blob:', blobError.message);
+        return res.status(500).json({ 
+          error: 'Failed to save state',
+          details: blobError.message 
+        });
+      }
     } else {
       return res.status(405).json({ error: 'Method not allowed' });
     }
@@ -97,7 +133,7 @@ export default async function handler(req, res) {
     console.error('❌ API Error:', error.message);
     // Don't return 500 - return partial state so frontend doesn't break
     return res.status(200).json({
-      ...DEFAULT_STATE,
+      ...JSON.parse(JSON.stringify(DEFAULT_STATE)),
       error: error.message
     });
   }
