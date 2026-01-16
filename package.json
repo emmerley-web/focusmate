@@ -2,5 +2,7 @@
   "name": "focusmate-tracker",
   "version": "1.0.0",
   "description": "FocusMate session tracker with GitHub API storage",
-  "dependencies": {}
+  "dependencies": {
+    "@octokit/rest": "^20.0.0"
+  }
 }
