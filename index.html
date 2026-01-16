@@ -464,39 +464,39 @@
         let allWeeklyGoals = {};
         let sessions = [];
 
-        // SYNC FROM SERVER ON PAGE LOAD
-        async function syncStateFromServer() {
+        // ========== SYNC WITH BLOB API ==========
+        async function loadStateFromBlob() {
+            console.log('🔄 Loading state from Blob API...');
             try {
                 const response = await fetch('/api/state');
                 if (!response.ok) {
-                    console.warn('⚠️ Could not sync from server');
-                    loadAllWeeksData();
-                    loadAllWeeklyGoals();
-                    return;
+                    console.warn('⚠️ API returned status', response.status);
+                    return false;
                 }
-                
-                const serverState = await response.json();
-                
-                if (serverState.allWeeksData && Object.keys(serverState.allWeeksData).length > 0) {
-                    allWeeksData = serverState.allWeeksData;
-                    localStorage.setItem(WEEKS_STORAGE, JSON.stringify(allWeeksData));
-                    console.log('✅ Synced weeks from server:', Object.keys(allWeeksData));
-                }
-                
-                if (serverState.allWeeklyGoals && Object.keys(serverState.allWeeklyGoals).length > 0) {
-                    allWeeklyGoals = serverState.allWeeklyGoals;
-                    localStorage.setItem(WEEKLY_GOALS_STORAGE, JSON.stringify(allWeeklyGoals));
-                    console.log('✅ Synced goals from server');
-                }
+
+                const state = await response.json();
+                console.log('✅ Loaded from Blob:', {
+                    weeks: Object.keys(state.allWeeksData || {}),
+                    goals: Object.keys(state.allWeeklyGoals || {})
+                });
+
+                allWeeksData = state.allWeeksData || {};
+                allWeeklyGoals = state.allWeeklyGoals || {};
+                sessions = state.sessions || [];
+
+                // Also save to localStorage as backup
+                localStorage.setItem(WEEKS_STORAGE, JSON.stringify(allWeeksData));
+                localStorage.setItem(WEEKLY_GOALS_STORAGE, JSON.stringify(allWeeklyGoals));
+
+                return true;
             } catch (error) {
-                console.warn('⚠️ Server sync failed:', error.message);
-                loadAllWeeksData();
-                loadAllWeeklyGoals();
+                console.warn('⚠️ Blob load failed:', error.message);
+                return false;
             }
         }
 
-        // SYNC TO SERVER EVERY 30 SECONDS
-        async function syncStateToServer() {
+        async function saveStateToBlob() {
+            console.log('💾 Saving state to Blob...');
             try {
                 const response = await fetch('/api/state', {
                     method: 'POST',
@@ -508,21 +508,32 @@
                         lastModified: new Date().toISOString()
                     })
                 });
-                
+
                 if (!response.ok) {
-                    console.warn('⚠️ Sync POST failed');
-                    return;
+                    console.warn('⚠️ POST failed, status:', response.status);
+                    return false;
                 }
-                
-                console.log('💾 State synced to server');
+
+                console.log('✅ Saved to Blob');
+                return true;
             } catch (error) {
-                console.warn('⚠️ Could not sync to server');
+                console.warn('⚠️ Blob save failed:', error.message);
+                return false;
             }
         }
 
+        // ========== PAGE INITIALIZATION ==========
         document.addEventListener('DOMContentLoaded', async () => {
+            console.log('🚀 Page loading...');
             loadSettings();
-            await syncStateFromServer();
+            
+            // Load from Blob first, fall back to localStorage
+            const blobLoaded = await loadStateFromBlob();
+            if (!blobLoaded) {
+                console.log('📌 Falling back to localStorage');
+                loadFromLocalStorage();
+            }
+
             generateTrackerGrid();
             generateDailyBars();
             generateSparkline();
@@ -530,10 +541,17 @@
             attachEventListeners();
             await fetchSessions();
             updateLastUpdated();
+
+            // Auto-fetch sessions every 5 minutes
             setInterval(fetchSessions, 5 * 60 * 1000);
-            setInterval(syncStateToServer, 30 * 1000);
+
+            // Auto-sync to Blob every 30 seconds
+            setInterval(saveStateToBlob, 30 * 1000);
+
+            console.log('✅ Page ready');
         });
 
+        // ========== UI GENERATION ==========
         function generateTrackerGrid() {
             const grid = document.getElementById('trackerGrid');
             grid.innerHTML = Array.from({ length: 40 }, (_, i) =>
@@ -602,16 +620,28 @@
 
             allWeeklyGoals[weekKey] = goals;
             localStorage.setItem(WEEKLY_GOALS_STORAGE, JSON.stringify(allWeeklyGoals));
-            syncStateToServer();
+            saveStateToBlob();
+            console.log('📝 Goals saved');
         }
 
-        function loadAllWeeklyGoals() {
-            const stored = localStorage.getItem(WEEKLY_GOALS_STORAGE);
-            if (stored) {
+        // ========== DATA LOADING ==========
+        function loadFromLocalStorage() {
+            const weeks = localStorage.getItem(WEEKS_STORAGE);
+            const goals = localStorage.getItem(WEEKLY_GOALS_STORAGE);
+
+            if (weeks) {
                 try {
-                    allWeeklyGoals = JSON.parse(stored);
+                    allWeeksData = JSON.parse(weeks);
                 } catch (e) {
-                    allWeeklyGoals = {};
+                    console.warn('⚠️ Failed to parse weeks from localStorage');
+                }
+            }
+
+            if (goals) {
+                try {
+                    allWeeklyGoals = JSON.parse(goals);
+                } catch (e) {
+                    console.warn('⚠️ Failed to parse goals from localStorage');
                 }
             }
         }
@@ -651,21 +681,7 @@
             localStorage.setItem(TIMEZONE_STORAGE, document.getElementById('timezone').value);
         }
 
-        function loadAllWeeksData() {
-            const stored = localStorage.getItem(WEEKS_STORAGE);
-            if (stored) {
-                try {
-                    allWeeksData = JSON.parse(stored);
-                } catch (e) {
-                    allWeeksData = {};
-                }
-            }
-        }
-
-        function saveAllWeeksData() {
-            localStorage.setItem(WEEKS_STORAGE, JSON.stringify(allWeeksData));
-        }
-
+        // ========== WEEK CALCULATION ==========
         function getWeekNumber() {
             const weekStart = new Date('2026-01-05');
             const now = new Date();
@@ -726,6 +742,7 @@
             }
         }
 
+        // ========== FETCH SESSIONS & PROCESS ==========
         async function fetchSessions() {
             if (currentViewingWeekOffset !== 0) return;
 
@@ -739,12 +756,14 @@
                 const startDate = weekData.weekStart.toISOString();
                 const endDate = new Date(weekData.weekStart.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
+                console.log(`🔄 Fetching Week ${weekData.weekNum} sessions...`);
+
                 const response = await fetch(
                     `/api/focusmate?start=${encodeURIComponent(startDate)}&end=${encodeURIComponent(endDate)}`
                 );
 
                 if (!response.ok) {
-                    console.warn('⚠️ API error - using localStorage');
+                    console.warn('⚠️ FocusMate API error - using stored data');
                     showFromStorage(targetUnits, weekData.weekNum);
                     updateLastUpdated();
                     return;
@@ -753,7 +772,7 @@
                 const data = await response.json();
 
                 if (!data.sessions || data.sessions.length === 0) {
-                    console.log('⚠️ No sessions from API - using localStorage');
+                    console.log('⚠️ No sessions from API - using stored data');
                     showFromStorage(targetUnits, weekData.weekNum);
                     updateLastUpdated();
                     return;
@@ -766,7 +785,7 @@
                 showSuccess(`✓ ${filteredSessions.length} sessions`);
                 updateLastUpdated();
             } catch (error) {
-                console.warn('⚠️ API failed, using localStorage:', error.message);
+                console.warn('⚠️ API failed:', error.message);
                 const weekData = getWeekData(timezone);
                 showFromStorage(targetUnits, weekData.weekNum);
                 updateLastUpdated();
@@ -793,14 +812,13 @@
                 if (session.startTime && session.duration) {
                     const sessionDate = new Date(session.startTime);
                     const diff = Math.floor((sessionDate - weekData.weekStart) / (1000 * 60 * 60 * 24));
-                    if (diff >= 0 && diff < 7) {
-                        const durationMinutes = session.duration / (1000 * 60);
-                        const units = Math.round(durationMinutes / 25);
-                        const dayName = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][diff];
-                        if (dayName) {
-                            dailyUnits[dayName] += units;
-                            totalUnits += units;
-                        }
+                    const durationMinutes = session.duration / (1000 * 60);
+                    const units = Math.round(durationMinutes / 25);
+                    const dayName = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][diff];
+                    
+                    if (dayName) {
+                        dailyUnits[dayName] += units;
+                        totalUnits += units;
                     }
                 }
             });
@@ -822,8 +840,9 @@
                 surplus,
                 bankedForNextWeek: bankedForNext
             };
-            saveAllWeeksData();
-            syncStateToServer();
+
+            localStorage.setItem(WEEKS_STORAGE, JSON.stringify(allWeeksData));
+            saveStateToBlob();
 
             updateUI(totalUnits, targetUnits, dailyUnits, weekNum, bankedFromPrevious, bankedForNext);
             updateSparkline();
