@@ -1,39 +1,31 @@
 {
   "allWeeksData": {
-    "week_2": {
-      "weekNum": 2,
-      "weekStart": "2026-01-11T17:00:00.000Z",
-      "completed": 27,
+    "week_1": {
+      "weekNum": 1,
+      "weekStart": "2026-01-05T00:00:00.000Z",
+      "completed": 42,
       "target": 40,
       "dailyUnits": {
         "Mon": 5,
-        "Tue": 6,
-        "Wed": 8,
-        "Thu": 8,
-        "Fri": 0,
-        "Sat": 0,
-        "Sun": 0
+        "Tue": 4,
+        "Wed": 12,
+        "Thu": 5,
+        "Fri": 8,
+        "Sat": 5,
+        "Sun": 3
       },
       "bankedFromPrevious": 0,
-      "surplus": 0,
-      "bankedForNextWeek": 0
+      "surplus": 2,
+      "bankedForNextWeek": 2
     }
   },
   "allWeeklyGoals": {
-    "week_2": [
-      {
-        "text": "hi there",
-        "done": true
-      },
-      {
-        "text": "",
-        "done": false
-      },
-      {
-        "text": "",
-        "done": false
-      }
+    "week_1": [
+      {"text": "", "done": false},
+      {"text": "", "done": false},
+      {"text": "", "done": false}
     ]
   },
-  "lastModified": "2026-01-15T16:23:37.801Z"
+  "sessions": [],
+  "lastModified": "2026-01-16T12:20:00.000Z"
 }
