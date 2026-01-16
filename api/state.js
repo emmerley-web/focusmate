@@ -1,5 +1,3 @@
-const fs = require('fs');
-const path = require('path');
 const { Octokit } = require('@octokit/rest');
 
 const octokit = new Octokit({
@@ -22,7 +20,6 @@ async function getStateFromGitHub() {
     return JSON.parse(content);
   } catch (error) {
     if (error.status === 404) {
-      console.log('📄 State file not found, returning empty state');
       return { 
         allWeeksData: {}, 
         allWeeklyGoals: {}, 
@@ -67,7 +64,7 @@ async function saveStateToGitHub(state) {
   }
 }
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -104,4 +101,4 @@ export default async function handler(req, res) {
     console.error('❌ API Error:', error);
     return res.status(500).json({ error: error.message });
   }
-}
+};
