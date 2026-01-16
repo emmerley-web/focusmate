@@ -1,5 +1,5 @@
 {
-  "buildCommand": "true",
+  "buildCommand": "npm install",
   "installCommand": "npm install",
   "outputDirectory": ".",
   "headers": [
