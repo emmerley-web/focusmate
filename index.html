@@ -468,13 +468,31 @@
         async function loadStateFromBlob() {
             console.log('🔄 Loading state from Blob API...');
             try {
-                const response = await fetch('/api/state');
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
+
+                const response = await fetch('/api/state', { signal: controller.signal });
+                clearTimeout(timeoutId);
+
                 if (!response.ok) {
                     console.warn('⚠️ API returned status', response.status);
                     return false;
                 }
 
-                const state = await response.json();
+                let state;
+                try {
+                    state = await response.json();
+                } catch (parseError) {
+                    console.warn('⚠️ Failed to parse JSON response:', parseError.message);
+                    return false;
+                }
+
+                // Validate state structure
+                if (!state || typeof state !== 'object') {
+                    console.warn('⚠️ Invalid state structure received');
+                    return false;
+                }
+
                 console.log('✅ Loaded from Blob:', {
                     weeks: Object.keys(state.allWeeksData || {}),
                     goals: Object.keys(state.allWeeklyGoals || {})
@@ -683,11 +701,16 @@
 
         // ========== WEEK CALCULATION ==========
         function getWeekNumber() {
-            const weekStart = new Date('2026-01-05');
+            const weekStart = new Date('2026-01-05T00:00:00Z');
             const now = new Date();
-            const diffTime = now - weekStart;
+            
+            if (now < weekStart) {
+                return 1; // Before Week 1 started
+            }
+            
+            const diffTime = now.getTime() - weekStart.getTime();
             const diffWeeks = Math.floor(diffTime / (7 * 24 * 60 * 60 * 1000));
-            return Math.max(1, diffWeeks + 1);
+            return diffWeeks + 1;
         }
 
         function getWeekData(timezone, weekOffset = 0) {
@@ -758,9 +781,14 @@
 
                 console.log(`🔄 Fetching Week ${weekData.weekNum} sessions...`);
 
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
                 const response = await fetch(
-                    `/api/focusmate?start=${encodeURIComponent(startDate)}&end=${encodeURIComponent(endDate)}`
+                    `/api/focusmate?start=${encodeURIComponent(startDate)}&end=${encodeURIComponent(endDate)}`,
+                    { signal: controller.signal }
                 );
+                clearTimeout(timeoutId);
 
                 if (!response.ok) {
                     console.warn('⚠️ FocusMate API error - using stored data');
@@ -769,7 +797,15 @@
                     return;
                 }
 
-                const data = await response.json();
+                let data;
+                try {
+                    data = await response.json();
+                } catch (parseError) {
+                    console.warn('⚠️ Failed to parse API response:', parseError);
+                    showFromStorage(targetUnits, weekData.weekNum);
+                    updateLastUpdated();
+                    return;
+                }
 
                 if (!data.sessions || data.sessions.length === 0) {
                     console.log('⚠️ No sessions from API - using stored data');
@@ -778,7 +814,8 @@
                     return;
                 }
 
-                const filteredSessions = data.sessions.filter(s => s.users && s.users.length >= 2);
+                // FIX: Count ALL sessions, not just 2+ user sessions
+                const filteredSessions = data.sessions;
                 sessions = filteredSessions;
 
                 processSessionData(filteredSessions, timezone, targetUnits, weekData.weekNum);
@@ -809,18 +846,30 @@
             let dailyUnits = { Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0, Sun: 0 };
 
             sessionsData.forEach(session => {
-                if (session.startTime && session.duration) {
-                    const sessionDate = new Date(session.startTime);
-                    const diff = Math.floor((sessionDate - weekData.weekStart) / (1000 * 60 * 60 * 24));
-                    const durationMinutes = session.duration / (1000 * 60);
-                    const units = Math.round(durationMinutes / 25);
-                    const dayName = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][diff];
-                    
-                    if (dayName) {
-                        dailyUnits[dayName] += units;
-                        totalUnits += units;
-                    }
+                if (!session.startTime || !session.duration) {
+                    console.warn('⚠️ Skipping session with missing time/duration');
+                    return;
                 }
+
+                const sessionDate = new Date(session.startTime);
+                const diff = Math.floor((sessionDate - weekData.weekStart) / (1000 * 60 * 60 * 24));
+
+                if (diff < 0 || diff > 6) {
+                    console.warn(`⚠️ Session on day ${diff} (outside week range)`);
+                    return;
+                }
+
+                const durationMinutes = session.duration / (1000 * 60);
+                const units = Math.round(durationMinutes / 25);
+                const dayName = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][diff];
+
+                if (!dayName) {
+                    console.warn('⚠️ Invalid day index:', diff);
+                    return;
+                }
+
+                dailyUnits[dayName] += units;
+                totalUnits += units;
             });
 
             const prevWeekKey = `week_${weekNum - 1}`;
