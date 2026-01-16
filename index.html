@@ -90,9 +90,11 @@
         }
 
         .tracker-square.banked {
-            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-            border-color: #f5576c;
-            box-shadow: 0 4px 15px rgba(245, 87, 108, 0.4);
+            background: linear-gradient(135deg, #a8d8ff 0%, #7bc0ff 100%);
+            border-color: #5ba3ff;
+            box-shadow: 0 4px 15px rgba(91, 163, 255, 0.4);
+            color: #2c5aa0;
+            font-size: 1.2em;
         }
 
         @keyframes fillIn {
@@ -390,7 +392,7 @@
                     </div>
                 </div>
                 <div class="progress-bar-container">
-                    <div class="progress-bar" id="progressBankedBar" style="width: 0%; background: linear-gradient(to right, #f093fb, #f5576c);">
+                    <div class="progress-bar" id="progressBankedBar" style="width: 0%; background: linear-gradient(to right, #667eea, #764ba2);">
                         <span id="progressBankedLabel">Banked: 0</span>
                     </div>
                 </div>
@@ -457,22 +459,79 @@
         const TIMEZONE_STORAGE = 'focusmate_timezone';
         const WEEKS_STORAGE = 'focusmate_weeks';
         const WEEKLY_GOALS_STORAGE = 'focusmate_weekly_goals';
-        let refreshInterval;
         let currentViewingWeekOffset = 0;
         let allWeeksData = {};
         let allWeeklyGoals = {};
         let sessions = [];
 
+        // SYNC FROM SERVER ON PAGE LOAD
+        async function syncStateFromServer() {
+            try {
+                const response = await fetch('/api/state');
+                if (!response.ok) {
+                    console.warn('⚠️ Could not sync from server');
+                    loadAllWeeksData();
+                    loadAllWeeklyGoals();
+                    return;
+                }
+                
+                const serverState = await response.json();
+                
+                if (serverState.allWeeksData && Object.keys(serverState.allWeeksData).length > 0) {
+                    allWeeksData = serverState.allWeeksData;
+                    localStorage.setItem(WEEKS_STORAGE, JSON.stringify(allWeeksData));
+                    console.log('✅ Synced weeks from server:', Object.keys(allWeeksData));
+                }
+                
+                if (serverState.allWeeklyGoals && Object.keys(serverState.allWeeklyGoals).length > 0) {
+                    allWeeklyGoals = serverState.allWeeklyGoals;
+                    localStorage.setItem(WEEKLY_GOALS_STORAGE, JSON.stringify(allWeeklyGoals));
+                    console.log('✅ Synced goals from server');
+                }
+            } catch (error) {
+                console.warn('⚠️ Server sync failed:', error.message);
+                loadAllWeeksData();
+                loadAllWeeklyGoals();
+            }
+        }
+
+        // SYNC TO SERVER EVERY 30 SECONDS
+        async function syncStateToServer() {
+            try {
+                const response = await fetch('/api/state', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        allWeeksData,
+                        allWeeklyGoals,
+                        sessions,
+                        lastModified: new Date().toISOString()
+                    })
+                });
+                
+                if (!response.ok) {
+                    console.warn('⚠️ Sync POST failed');
+                    return;
+                }
+                
+                console.log('💾 State synced to server');
+            } catch (error) {
+                console.warn('⚠️ Could not sync to server');
+            }
+        }
+
         document.addEventListener('DOMContentLoaded', async () => {
             loadSettings();
-            await loadStateFromAPI();
+            await syncStateFromServer();
             generateTrackerGrid();
             generateDailyBars();
             generateSparkline();
             generateWeeklyGoals();
             attachEventListeners();
-            fetchSessions();
-            refreshInterval = setInterval(fetchSessions, 5 * 60 * 1000);
+            await fetchSessions();
+            updateLastUpdated();
+            setInterval(fetchSessions, 5 * 60 * 1000);
+            setInterval(syncStateToServer, 30 * 1000);
         });
 
         function generateTrackerGrid() {
@@ -543,7 +602,7 @@
 
             allWeeklyGoals[weekKey] = goals;
             localStorage.setItem(WEEKLY_GOALS_STORAGE, JSON.stringify(allWeeklyGoals));
-            saveStateToAPI();
+            syncStateToServer();
         }
 
         function loadAllWeeklyGoals() {
@@ -605,7 +664,6 @@
 
         function saveAllWeeksData() {
             localStorage.setItem(WEEKS_STORAGE, JSON.stringify(allWeeksData));
-            saveStateToAPI();
         }
 
         function getWeekNumber() {
@@ -686,32 +744,43 @@
                 );
 
                 if (!response.ok) {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || `API returned ${response.status}`);
+                    console.warn('⚠️ API error - using localStorage');
+                    showFromStorage(targetUnits, weekData.weekNum);
+                    updateLastUpdated();
+                    return;
                 }
 
                 const data = await response.json();
 
                 if (!data.sessions || data.sessions.length === 0) {
-                    console.log('⚠️ No sessions from API - preserving existing week data');
-                    saveStateToAPI();
+                    console.log('⚠️ No sessions from API - using localStorage');
+                    showFromStorage(targetUnits, weekData.weekNum);
                     updateLastUpdated();
                     return;
                 }
 
                 const filteredSessions = data.sessions.filter(s => s.users && s.users.length >= 2);
-
                 sessions = filteredSessions;
-                console.log(`📊 Loaded ${filteredSessions.length} sessions from API`);
 
                 processSessionData(filteredSessions, timezone, targetUnits, weekData.weekNum);
-                showSuccess(`Loaded ${filteredSessions.length} sessions`);
+                showSuccess(`✓ ${filteredSessions.length} sessions`);
                 updateLastUpdated();
             } catch (error) {
-                console.error('Fetch error:', error);
-                showError(`API Error: ${error.message}`);
+                console.warn('⚠️ API failed, using localStorage:', error.message);
+                const weekData = getWeekData(timezone);
+                showFromStorage(targetUnits, weekData.weekNum);
                 updateLastUpdated();
-                saveStateToAPI();
+            }
+        }
+
+        function showFromStorage(targetUnits, weekNum) {
+            const weekKey = `week_${weekNum}`;
+            if (allWeeksData[weekKey]) {
+                const data = allWeeksData[weekKey];
+                updateUI(data.completed, data.target, data.dailyUnits, weekNum, data.bankedFromPrevious, data.bankedForNextWeek);
+                updateSparkline();
+            } else {
+                updateUI(0, targetUnits, { Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0, Sun: 0 }, weekNum, 0, 0);
             }
         }
 
@@ -754,6 +823,7 @@
                 bankedForNextWeek: bankedForNext
             };
             saveAllWeeksData();
+            syncStateToServer();
 
             updateUI(totalUnits, targetUnits, dailyUnits, weekNum, bankedFromPrevious, bankedForNext);
             updateSparkline();
@@ -783,6 +853,7 @@
                     sq.classList.remove('filled', 'banked');
                     if (i <= bankedFromPrevious) {
                         sq.classList.add('banked');
+                        sq.textContent = '⭐';
                         sq.style.transitionDelay = `${(i - 1) * 0.05}s`;
                     } else if (i <= bankedFromPrevious + filledCount) {
                         sq.classList.add('filled');
@@ -882,165 +953,6 @@
             const container = document.getElementById('messageContainer');
             container.innerHTML = `<div class="error-message">${msg}</div>`;
             setTimeout(() => { container.innerHTML = ''; }, 5000);
-        }
-
-        function recalculateWeeksFromSessions() {
-            if (!sessions || sessions.length === 0) {
-                console.log('📊 No sessions to recalculate');
-                return;
-            }
-
-            console.log('🔄 Recalculating weeks from', sessions.length, 'sessions...');
-            const timezone = document.getElementById('timezone').value || 'Asia/Bangkok';
-            
-            const newWeeksData = {};
-            
-            sessions.forEach(session => {
-                if (session.startTime && session.duration) {
-                    const sessionDate = new Date(session.startTime);
-                    const weekStart = new Date('2026-01-05');
-                    const diff = Math.floor((sessionDate - weekStart) / (1000 * 60 * 60 * 24));
-                    const weekNum = Math.floor(diff / 7) + 1;
-                    
-                    if (weekNum >= 1) {
-                        const weekKey = `week_${weekNum}`;
-                        
-                        if (!newWeeksData[weekKey]) {
-                            newWeeksData[weekKey] = {
-                                weekNum,
-                                weekStart: new Date(weekStart.getTime() + (weekNum - 1) * 7 * 24 * 60 * 60 * 1000).toISOString(),
-                                completed: 0,
-                                target: 40,
-                                dailyUnits: { Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0, Sun: 0 },
-                                bankedFromPrevious: 0,
-                                surplus: 0,
-                                bankedForNextWeek: 0
-                            };
-                        }
-                        
-                        const durationMinutes = session.duration / (1000 * 60);
-                        const units = Math.round(durationMinutes / 25);
-                        const dayName = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][diff % 7];
-                        
-                        if (dayName) {
-                            newWeeksData[weekKey].dailyUnits[dayName] += units;
-                            newWeeksData[weekKey].completed += units;
-                        }
-                    }
-                }
-            });
-            
-            const sortedWeeks = Object.keys(newWeeksData).sort((a, b) => {
-                const weekA = parseInt(a.split('_')[1]);
-                const weekB = parseInt(b.split('_')[1]);
-                return weekA - weekB;
-            });
-            
-            sortedWeeks.forEach((weekKey, idx) => {
-                const week = newWeeksData[weekKey];
-                const prevWeekKey = idx > 0 ? sortedWeeks[idx - 1] : null;
-                
-                if (prevWeekKey) {
-                    const prevWeek = newWeeksData[prevWeekKey];
-                    week.bankedFromPrevious = prevWeek.bankedForNextWeek;
-                } else {
-                    week.bankedFromPrevious = 0;
-                }
-                
-                const unitsNeeded = Math.max(0, week.target - week.bankedFromPrevious);
-                week.surplus = Math.max(0, week.completed - unitsNeeded);
-                week.bankedForNextWeek = week.bankedFromPrevious + week.surplus;
-            });
-            
-            allWeeksData = { ...newWeeksData, ...allWeeksData };
-            
-            console.log('✅ Recalculated', Object.keys(allWeeksData).length, 'weeks from sessions');
-        }
-
-        async function loadStateFromAPI() {
-            try {
-                console.log('🔍 Loading state from API...');
-
-                const response = await fetch('/api/state');
-                console.log('📡 /api/state response status:', response.status);
-
-                if (!response.ok) {
-                    throw new Error(`API returned ${response.status}`);
-                }
-
-                const state = await response.json();
-                console.log('✅ Loaded from API:', {
-                    weeks: Object.keys(state.allWeeksData || {}),
-                    goals: Object.keys(state.allWeeklyGoals || {}),
-                    sessions: (state.sessions || []).length
-                });
-
-                allWeeksData = state.allWeeksData || {};
-                allWeeklyGoals = state.allWeeklyGoals || {};
-                sessions = state.sessions || [];
-
-                console.log('✅ State loaded:', {
-                    weeksLoaded: Object.keys(allWeeksData),
-                    sessionCount: sessions.length
-                });
-
-                if (sessions.length > 0) {
-                    recalculateWeeksFromSessions();
-                }
-
-                if (Object.keys(allWeeksData).length === 0) {
-                    const localWeeks = localStorage.getItem(WEEKS_STORAGE);
-                    if (localWeeks) {
-                        try {
-                            allWeeksData = JSON.parse(localWeeks);
-                            console.log('📱 Also loaded allWeeksData from localStorage backup');
-                        } catch (e) {
-                            console.log('Could not parse localStorage weeks');
-                        }
-                    }
-                }
-
-                if (Object.keys(allWeeklyGoals).length === 0) {
-                    const localGoals = localStorage.getItem(WEEKLY_GOALS_STORAGE);
-                    if (localGoals) {
-                        try {
-                            allWeeklyGoals = JSON.parse(localGoals);
-                            console.log('📱 Also loaded allWeeklyGoals from localStorage backup');
-                        } catch (e) {
-                            console.log('Could not parse localStorage goals');
-                        }
-                    }
-                }
-
-            } catch (error) {
-                console.error('❌ Failed to load from API:', error);
-                console.log('Falling back to localStorage only');
-                loadAllWeeksData();
-                loadAllWeeklyGoals();
-            }
-        }
-
-        async function saveStateToAPI() {
-            try {
-                const response = await fetch('/api/state', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        allWeeksData,
-                        allWeeklyGoals,
-                        sessions,
-                        lastModified: new Date().toISOString()
-                    })
-                });
-
-                if (!response.ok) {
-                    throw new Error(`API error: ${response.status}`);
-                }
-
-                console.log('💾 State saved to API');
-            } catch (error) {
-                console.error('❌ Failed to save to API:', error);
-            }
         }
     </script>
 </body>
