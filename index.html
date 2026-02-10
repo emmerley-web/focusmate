@@ -540,6 +540,54 @@
             }
         }
 
+        // Track when local data was last modified by user action
+        let localLastModified = null;
+
+        async function syncWithBlob() {
+            try {
+                // Load remote state
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 5000);
+                const response = await fetch('/api/state', { signal: controller.signal });
+                clearTimeout(timeoutId);
+
+                if (response.ok) {
+                    const remoteState = await response.json();
+                    if (remoteState && remoteState.lastModified) {
+                        const remoteTime = new Date(remoteState.lastModified).getTime();
+                        const localTime = localLastModified ? new Date(localLastModified).getTime() : 0;
+
+                        if (remoteTime > localTime) {
+                            // Remote is newer - adopt remote data
+                            console.log('Sync: remote is newer, updating local');
+                            allWeeksData = remoteState.allWeeksData || {};
+                            allWeeklyGoals = remoteState.allWeeklyGoals || {};
+                            sessions = remoteState.sessions || [];
+                            localStorage.setItem(WEEKS_STORAGE, JSON.stringify(allWeeksData));
+                            localStorage.setItem(WEEKLY_GOALS_STORAGE, JSON.stringify(allWeeklyGoals));
+                            // Refresh UI with updated data
+                            if (currentViewingWeekOffset === 0) {
+                                const timezone = document.getElementById('timezone').value;
+                                const weekData = getWeekData(timezone);
+                                const weekKey = `week_${weekData.weekNum}`;
+                                if (allWeeksData[weekKey]) {
+                                    const data = allWeeksData[weekKey];
+                                    updateUI(data.completed, data.target, data.dailyUnits, weekData.weekNum, data.bankedFromPrevious, data.bankedForNextWeek);
+                                }
+                            }
+                            generateWeeklyGoals();
+                            return;
+                        }
+                    }
+                }
+            } catch (e) {
+                // Ignore sync load failures
+            }
+
+            // Local is newer or remote failed - save local state
+            await saveStateToBlob();
+        }
+
         // ========== PAGE INITIALIZATION ==========
         document.addEventListener('DOMContentLoaded', async () => {
             console.log('🚀 Page loading...');
@@ -563,8 +611,8 @@
             // Auto-fetch sessions every 5 minutes
             setInterval(fetchSessions, 5 * 60 * 1000);
 
-            // Auto-sync to Blob every 30 seconds
-            setInterval(saveStateToBlob, 30 * 1000);
+            // Bidirectional sync with Blob every 30 seconds
+            setInterval(syncWithBlob, 30 * 1000);
 
             console.log('✅ Page ready');
         });
@@ -638,6 +686,7 @@
 
             allWeeklyGoals[weekKey] = goals;
             localStorage.setItem(WEEKLY_GOALS_STORAGE, JSON.stringify(allWeeklyGoals));
+            localLastModified = new Date().toISOString();
             saveStateToBlob();
             console.log('📝 Goals saved');
         }
@@ -860,6 +909,7 @@
                 }
 
                 const durationMinutes = session.duration / (1000 * 60);
+                if (durationMinutes < 15) return; // Filter false starts
                 const units = Math.round(durationMinutes / 25);
                 const dayName = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][diff];
 
@@ -874,8 +924,7 @@
 
             const prevWeekKey = `week_${weekNum - 1}`;
             const bankedFromPrevious = allWeeksData[prevWeekKey] ? allWeeksData[prevWeekKey].bankedForNextWeek : 0;
-            const unitsNeeded = Math.max(0, targetUnits - bankedFromPrevious);
-            const surplus = Math.max(0, totalUnits - unitsNeeded);
+            const surplus = Math.max(0, totalUnits - targetUnits);
             const bankedForNext = bankedFromPrevious + surplus;
 
             const weekKey = `week_${weekNum}`;
@@ -891,6 +940,7 @@
             };
 
             localStorage.setItem(WEEKS_STORAGE, JSON.stringify(allWeeksData));
+            localLastModified = new Date().toISOString();
             saveStateToBlob();
 
             updateUI(totalUnits, targetUnits, dailyUnits, weekNum, bankedFromPrevious, bankedForNext);
@@ -902,9 +952,10 @@
         }
 
         function updateUI(units, target, dailyUnits, weekNum, bankedFromPrevious = 0, bankedForNext = 0) {
-            const unitsNeeded = Math.max(0, target - bankedFromPrevious);
-            const filledCount = Math.min(units, target);
-            const totalDisplayed = bankedFromPrevious + units;
+            // filledCount = how many completed squares to show (after banked squares)
+            const filledCount = Math.min(units, Math.max(0, target - bankedFromPrevious));
+            // totalProgress = banked + completed, used for status/progress tracking
+            const totalProgress = bankedFromPrevious + units;
 
             const weekStart = new Date('2026-01-05');
             weekStart.setDate(weekStart.getDate() + (weekNum - 1) * 7);
@@ -913,12 +964,14 @@
             const dateStr = `${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}-${weekEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
 
             document.getElementById('weekHeader').textContent = `Week ${weekNum} (${dateStr})`;
-            document.getElementById('weekSubheader').textContent = `Completed: ${totalDisplayed}/${target}`;
+            const bankedLabel = bankedFromPrevious > 0 ? ` (+${bankedFromPrevious} banked)` : '';
+            document.getElementById('weekSubheader').textContent = `Completed: ${units}/${target}${bankedLabel}`;
 
             for (let i = 1; i <= 40; i++) {
                 const sq = document.querySelector(`.tracker-square[data-unit="${i}"]`);
                 if (sq) {
                     sq.classList.remove('filled', 'banked');
+                    sq.textContent = '';
                     if (i <= bankedFromPrevious) {
                         sq.classList.add('banked');
                         sq.textContent = '⭐';
@@ -940,7 +993,7 @@
                 if (dayText) dayText.textContent = dayU;
             });
 
-            const pct = (totalDisplayed / target) * 100;
+            const pct = (totalProgress / target) * 100;
             const icon = document.getElementById('statusIcon');
             const text = document.getElementById('statusText');
             if (pct >= 100) {
@@ -957,16 +1010,16 @@
                 text.textContent = 'Keep going 🚀';
             }
 
-            const surplus = Math.max(0, units - unitsNeeded);
+            const surplus = Math.max(0, units - target);
             const progressSection = document.getElementById('progressSection');
-            if (surplus > 0 && currentViewingWeekOffset === 0) {
+            if (bankedForNext > 0 && currentViewingWeekOffset === 0) {
                 progressSection.style.display = 'block';
-                const completedPct = (totalDisplayed / target) * 100;
+                const completedPct = (units / target) * 100;
                 const bankedPct = (bankedForNext / target) * 100;
                 document.getElementById('progressCompletedBar').style.width = `${Math.min(completedPct, 100)}%`;
-                document.getElementById('progressCompletedLabel').textContent = `${totalDisplayed}/${target}`;
+                document.getElementById('progressCompletedLabel').textContent = `${units}/${target}`;
                 document.getElementById('progressBankedBar').style.width = `${Math.min(bankedPct, 100)}%`;
-                document.getElementById('progressBankedLabel').textContent = `${bankedForNext}`;
+                document.getElementById('progressBankedLabel').textContent = `Banked: ${bankedForNext}`;
             } else {
                 progressSection.style.display = 'none';
             }

@@ -1,8 +1,9 @@
-import { put, get } from '@vercel/blob';
+import { put, list } from '@vercel/blob';
 
+const BLOB_PREFIX = 'focusmate-state';
 const BLOB_KEY = 'focusmate-state.json';
 
-// Default state if Blob is empty
+// Default state if Blob is empty (Week 1 historical data)
 const DEFAULT_STATE = {
   allWeeksData: {
     week_1: {
@@ -35,6 +36,29 @@ const DEFAULT_STATE = {
   lastModified: new Date().toISOString()
 };
 
+async function readStateFromBlob() {
+  try {
+    const { blobs } = await list({ prefix: BLOB_PREFIX, limit: 10 });
+    if (blobs.length === 0) {
+      return null;
+    }
+
+    // Sort by uploadedAt descending to get the most recent blob
+    blobs.sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt));
+
+    const response = await fetch(blobs[0].url);
+    if (!response.ok) {
+      console.error('Failed to fetch blob content:', response.status);
+      return null;
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Failed to read from Blob:', error.message);
+    return null;
+  }
+}
+
 export default async function handler(req, res) {
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -47,41 +71,24 @@ export default async function handler(req, res) {
 
   try {
     if (req.method === 'GET') {
-      // READ from Blob
-      let state;
-      try {
-        const blob = await get(BLOB_KEY);
-        if (!blob) {
-          console.log('📦 Blob empty, returning default state');
-          state = JSON.parse(JSON.stringify(DEFAULT_STATE));
-          state.lastModified = new Date().toISOString();
-        } else {
-          // Handle both string and Buffer types
-          const blobString = typeof blob === 'string' ? blob : blob.toString();
-          state = JSON.parse(blobString);
-          
-          // Validate state structure
-          if (!state.allWeeksData) state.allWeeksData = {};
-          if (!state.allWeeklyGoals) state.allWeeklyGoals = {};
-          if (!state.sessions) state.sessions = [];
-          
-          console.log('📦 Loaded from Blob:', {
-            weeks: Object.keys(state.allWeeksData || {}),
-            goals: Object.keys(state.allWeeklyGoals || {})
-          });
-        }
-      } catch (error) {
-        console.log('📦 Blob read failed, using default:', error.message);
+      let state = await readStateFromBlob();
+
+      if (!state) {
+        console.log('Blob empty, returning default state');
         state = JSON.parse(JSON.stringify(DEFAULT_STATE));
         state.lastModified = new Date().toISOString();
+      } else {
+        // Validate state structure
+        if (!state.allWeeksData) state.allWeeksData = {};
+        if (!state.allWeeklyGoals) state.allWeeklyGoals = {};
+        if (!state.sessions) state.sessions = [];
       }
 
       return res.status(200).json(state);
+
     } else if (req.method === 'POST') {
-      // WRITE to Blob - FIX: Parse JSON body properly
       let bodyData;
       try {
-        // Handle both parsed object and string body
         if (typeof req.body === 'string') {
           bodyData = JSON.parse(req.body);
         } else if (typeof req.body === 'object') {
@@ -90,10 +97,9 @@ export default async function handler(req, res) {
           throw new Error('Invalid body type');
         }
       } catch (parseError) {
-        console.error('❌ Failed to parse request body:', parseError.message);
-        return res.status(400).json({ 
+        return res.status(400).json({
           error: 'Invalid JSON in request body',
-          details: parseError.message 
+          details: parseError.message
         });
       }
 
@@ -109,29 +115,24 @@ export default async function handler(req, res) {
       try {
         await put(BLOB_KEY, JSON.stringify(state, null, 2), {
           access: 'public',
-          contentType: 'application/json'
-        });
-
-        console.log('💾 Saved to Blob:', {
-          weeks: Object.keys(state.allWeeksData),
-          goals: Object.keys(state.allWeeklyGoals),
-          sessions: state.sessions.length
+          contentType: 'application/json',
+          addRandomSuffix: false
         });
 
         return res.status(200).json({ success: true, state });
       } catch (blobError) {
-        console.error('❌ Failed to write to Blob:', blobError.message);
-        return res.status(500).json({ 
+        console.error('Failed to write to Blob:', blobError.message);
+        return res.status(500).json({
           error: 'Failed to save state',
-          details: blobError.message 
+          details: blobError.message
         });
       }
+
     } else {
       return res.status(405).json({ error: 'Method not allowed' });
     }
   } catch (error) {
-    console.error('❌ API Error:', error.message);
-    // Don't return 500 - return partial state so frontend doesn't break
+    console.error('API Error:', error.message);
     return res.status(200).json({
       ...JSON.parse(JSON.stringify(DEFAULT_STATE)),
       error: error.message
