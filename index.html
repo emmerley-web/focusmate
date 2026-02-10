@@ -628,6 +628,10 @@
             generateSparkline();
             generateWeeklyGoals();
             attachEventListeners();
+
+            // Backfill historical weeks to rebuild banking chain
+            await backfillHistoricalWeeks();
+
             await fetchSessions();
             updateLastUpdated();
 
@@ -899,6 +903,104 @@
                 showFromStorage(targetUnits, weekData.weekNum);
                 updateLastUpdated();
             }
+        }
+
+        // ========== HISTORICAL BACKFILL ==========
+        async function backfillHistoricalWeeks() {
+            const currentWeek = getWeekNumber();
+            if (currentWeek <= 1) return;
+
+            console.log(`🔄 Backfilling weeks 1-${currentWeek}...`);
+            const programStart = new Date('2026-01-05T00:00:00Z');
+
+            for (let wk = 1; wk <= currentWeek; wk++) {
+                const weekKey = `week_${wk}`;
+                const existing = allWeeksData[weekKey];
+
+                // Skip if we already have full data with banking calculated
+                if (existing && existing.completed > 0 && existing.bankedForNextWeek !== undefined) {
+                    // Recalculate banking chain from previous week
+                    const prevKey = `week_${wk - 1}`;
+                    const bankedFromPrevious = wk > 1 && allWeeksData[prevKey] ? allWeeksData[prevKey].bankedForNextWeek : 0;
+                    const target = existing.target || 40;
+                    const surplus = Math.max(0, existing.completed - target);
+                    existing.bankedFromPrevious = bankedFromPrevious;
+                    existing.surplus = surplus;
+                    existing.bankedForNextWeek = bankedFromPrevious + surplus;
+                    allWeeksData[weekKey] = existing;
+                    continue;
+                }
+
+                // Fetch sessions for this week from FocusMate API
+                const weekStart = new Date(programStart.getTime() + (wk - 1) * 7 * 24 * 60 * 60 * 1000);
+                const weekEnd = new Date(weekStart.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+                try {
+                    const response = await fetch(
+                        `/api/focusmate?start=${encodeURIComponent(weekStart.toISOString())}&end=${encodeURIComponent(weekEnd.toISOString())}`
+                    );
+                    if (!response.ok) continue;
+
+                    const data = await response.json();
+                    if (!data.sessions || data.sessions.length === 0) {
+                        // No sessions - still set up banking chain
+                        const prevKey = `week_${wk - 1}`;
+                        const bankedFromPrevious = wk > 1 && allWeeksData[prevKey] ? allWeeksData[prevKey].bankedForNextWeek : 0;
+                        allWeeksData[weekKey] = {
+                            weekNum: wk,
+                            weekStart: weekStart.toISOString(),
+                            completed: 0,
+                            target: 40,
+                            dailyUnits: { Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0, Sun: 0 },
+                            bankedFromPrevious,
+                            surplus: 0,
+                            bankedForNextWeek: bankedFromPrevious
+                        };
+                        continue;
+                    }
+
+                    let totalUnits = 0;
+                    let dailyUnits = { Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0, Sun: 0 };
+
+                    data.sessions.forEach(session => {
+                        if (!session.startTime || !session.duration) return;
+                        const sessionDate = new Date(session.startTime);
+                        const diff = Math.floor((sessionDate - weekStart) / (1000 * 60 * 60 * 24));
+                        if (diff < 0 || diff > 6) return;
+                        const durationMinutes = session.duration / (1000 * 60);
+                        if (durationMinutes < 15) return;
+                        const units = Math.round(durationMinutes / 25);
+                        const dayName = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][diff];
+                        if (!dayName) return;
+                        dailyUnits[dayName] += units;
+                        totalUnits += units;
+                    });
+
+                    const prevKey = `week_${wk - 1}`;
+                    const bankedFromPrevious = wk > 1 && allWeeksData[prevKey] ? allWeeksData[prevKey].bankedForNextWeek : 0;
+                    const target = 40;
+                    const surplus = Math.max(0, totalUnits - target);
+                    const bankedForNext = bankedFromPrevious + surplus;
+
+                    allWeeksData[weekKey] = {
+                        weekNum: wk,
+                        weekStart: weekStart.toISOString(),
+                        completed: totalUnits,
+                        target,
+                        dailyUnits,
+                        bankedFromPrevious,
+                        surplus,
+                        bankedForNextWeek: bankedForNext
+                    };
+                } catch (e) {
+                    console.warn(`⚠️ Backfill failed for week ${wk}:`, e.message);
+                }
+            }
+
+            localStorage.setItem(WEEKS_STORAGE, JSON.stringify(allWeeksData));
+            localLastModified = new Date().toISOString();
+            saveStateToBlob();
+            console.log('✅ Backfill complete');
         }
 
         function showFromStorage(targetUnits, weekNum) {
