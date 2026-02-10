@@ -469,7 +469,7 @@
             console.log('🔄 Loading state from Blob API...');
             try {
                 const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
+                const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout for cold starts
 
                 const response = await fetch('/api/state', { signal: controller.signal });
                 clearTimeout(timeoutId);
@@ -592,12 +592,35 @@
         document.addEventListener('DOMContentLoaded', async () => {
             console.log('🚀 Page loading...');
             loadSettings();
-            
-            // Load from Blob first, fall back to localStorage
+
+            // Always load localStorage first as baseline
+            loadFromLocalStorage();
+            const localWeeks = { ...allWeeksData };
+            const localGoals = { ...allWeeklyGoals };
+
+            // Then load from Blob and merge (Blob may have data from other platforms)
             const blobLoaded = await loadStateFromBlob();
-            if (!blobLoaded) {
-                console.log('📌 Falling back to localStorage');
-                loadFromLocalStorage();
+            if (blobLoaded) {
+                // Merge: for each week, keep the entry with more completed sessions
+                for (const key of Object.keys(localWeeks)) {
+                    if (!allWeeksData[key] || (localWeeks[key].completed > (allWeeksData[key].completed || 0))) {
+                        allWeeksData[key] = localWeeks[key];
+                    }
+                }
+                // Merge goals: keep non-empty goals from either source
+                for (const key of Object.keys(localGoals)) {
+                    const localG = localGoals[key] || [];
+                    const blobG = allWeeklyGoals[key] || [];
+                    const localHasContent = localG.some(g => g.text && g.text.trim());
+                    const blobHasContent = blobG.some(g => g.text && g.text.trim());
+                    if (localHasContent && !blobHasContent) {
+                        allWeeklyGoals[key] = localG;
+                    }
+                }
+                // Save merged state back
+                localStorage.setItem(WEEKS_STORAGE, JSON.stringify(allWeeksData));
+                localStorage.setItem(WEEKLY_GOALS_STORAGE, JSON.stringify(allWeeklyGoals));
+                saveStateToBlob();
             }
 
             generateTrackerGrid();
@@ -952,10 +975,8 @@
         }
 
         function updateUI(units, target, dailyUnits, weekNum, bankedFromPrevious = 0, bankedForNext = 0) {
-            // filledCount = how many completed squares to show (after banked squares)
-            const filledCount = Math.min(units, Math.max(0, target - bankedFromPrevious));
-            // totalProgress = banked + completed, used for status/progress tracking
-            const totalProgress = bankedFromPrevious + units;
+            const filledCount = Math.min(units, target);
+            const totalDisplayed = bankedFromPrevious + units;
 
             const weekStart = new Date('2026-01-05');
             weekStart.setDate(weekStart.getDate() + (weekNum - 1) * 7);
@@ -964,14 +985,12 @@
             const dateStr = `${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}-${weekEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
 
             document.getElementById('weekHeader').textContent = `Week ${weekNum} (${dateStr})`;
-            const bankedLabel = bankedFromPrevious > 0 ? ` (+${bankedFromPrevious} banked)` : '';
-            document.getElementById('weekSubheader').textContent = `Completed: ${units}/${target}${bankedLabel}`;
+            document.getElementById('weekSubheader').textContent = `Completed: ${totalDisplayed}/${target}`;
 
             for (let i = 1; i <= 40; i++) {
                 const sq = document.querySelector(`.tracker-square[data-unit="${i}"]`);
                 if (sq) {
                     sq.classList.remove('filled', 'banked');
-                    sq.textContent = '';
                     if (i <= bankedFromPrevious) {
                         sq.classList.add('banked');
                         sq.textContent = '⭐';
@@ -993,7 +1012,7 @@
                 if (dayText) dayText.textContent = dayU;
             });
 
-            const pct = (totalProgress / target) * 100;
+            const pct = (totalDisplayed / target) * 100;
             const icon = document.getElementById('statusIcon');
             const text = document.getElementById('statusText');
             if (pct >= 100) {
@@ -1012,14 +1031,14 @@
 
             const surplus = Math.max(0, units - target);
             const progressSection = document.getElementById('progressSection');
-            if (bankedForNext > 0 && currentViewingWeekOffset === 0) {
+            if (surplus > 0 && currentViewingWeekOffset === 0) {
                 progressSection.style.display = 'block';
-                const completedPct = (units / target) * 100;
+                const completedPct = (totalDisplayed / target) * 100;
                 const bankedPct = (bankedForNext / target) * 100;
                 document.getElementById('progressCompletedBar').style.width = `${Math.min(completedPct, 100)}%`;
-                document.getElementById('progressCompletedLabel').textContent = `${units}/${target}`;
+                document.getElementById('progressCompletedLabel').textContent = `${totalDisplayed}/${target}`;
                 document.getElementById('progressBankedBar').style.width = `${Math.min(bankedPct, 100)}%`;
-                document.getElementById('progressBankedLabel').textContent = `Banked: ${bankedForNext}`;
+                document.getElementById('progressBankedLabel').textContent = `${bankedForNext}`;
             } else {
                 progressSection.style.display = 'none';
             }
