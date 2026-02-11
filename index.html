@@ -5,6 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>FocusMate Tracker</title>
     <style>
+        :root {
+            --color-bg: #1f2121;
+            --color-surface: #262828;
+            --color-text: #fffdf9;
+            --color-text-secondary: #a7a9a9;
+            --color-primary: #32b8c6;
+            --color-primary-hover: #2da6b2;
+            --color-primary-light: rgba(50, 184, 198, 0.4);
+            --color-success: #34d399;
+            --color-danger: #ff5459;
+            --color-border: rgba(119, 124, 124, 0.3);
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -12,107 +25,109 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background-color: var(--color-bg);
+            color: var(--color-text);
+            padding: 16px;
             min-height: 100vh;
-            padding: 20px;
         }
 
         .container {
-            max-width: 900px;
+            max-width: 600px;
             margin: 0 auto;
         }
 
-        h1 {
-            text-align: center;
-            color: #333;
-            margin-bottom: 30px;
-            font-size: 2.5em;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 32px;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            font-weight: 600;
         }
 
         .card {
-            background: white;
+            background-color: var(--color-surface);
+            border: 1px solid var(--color-border);
             border-radius: 12px;
-            padding: 25px;
-            margin-bottom: 25px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-            transition: transform 0.3s ease;
-        }
-
-        .card:hover {
-            transform: translateY(-5px);
-        }
-
-        .week-header {
-            text-align: center;
+            padding: 20px;
             margin-bottom: 20px;
         }
 
-        .week-header h2 {
-            color: #2c3e50;
-            font-size: 1.8em;
-            margin-bottom: 5px;
+        .week-summary {
+            text-align: center;
+            margin-bottom: 24px;
         }
 
-        .week-header p {
-            color: #7f8c8d;
-            font-size: 1.1em;
+        .week-header {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--color-primary);
+            margin-bottom: 6px;
+        }
+
+        .week-subheader {
+            font-size: 14px;
+            color: var(--color-text-secondary);
+            font-weight: 400;
         }
 
         .tracker-grid {
             display: grid;
             grid-template-columns: repeat(10, 1fr);
-            gap: 8px;
-            margin: 20px 0;
+            gap: 6px;
+            margin: 24px 0;
+            padding: 16px 0;
         }
 
         .tracker-square {
             aspect-ratio: 1;
+            background-color: rgba(119, 124, 124, 0.2);
             border-radius: 8px;
-            background: #ecf0f1;
-            border: 2px solid #bdc3c7;
-            cursor: pointer;
-            transition: all 0.3s ease;
+            border: 2px solid rgba(119, 124, 124, 0.3);
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-weight: bold;
-            color: white;
-            font-size: 0.7em;
+            font-size: 10px;
+            font-weight: 600;
+            cursor: default;
+            position: relative;
+            overflow: hidden;
         }
 
         .tracker-square.filled {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-color: #667eea;
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
-            animation: fillIn 0.6s ease forwards;
+            background: linear-gradient(135deg, #32b8c6, #2da6b2);
+            border-color: #32b8c6;
+            color: #262828;
+            box-shadow: 0 0 12px rgba(50, 184, 198, 0.4);
+        }
+
+        .tracker-square.filled::after {
+            content: '✓';
+            font-weight: 700;
         }
 
         .tracker-square.banked {
-            background: linear-gradient(135deg, #a8d8ff 0%, #7bc0ff 100%);
-            border-color: #5ba3ff;
-            box-shadow: 0 4px 15px rgba(91, 163, 255, 0.4);
-            color: #2c5aa0;
-            font-size: 1.2em;
+            background: linear-gradient(135deg, rgba(50, 184, 198, 0.5), rgba(45, 166, 178, 0.5));
+            border-color: rgba(50, 184, 198, 0.6);
+            color: #262828;
+            box-shadow: 0 0 8px rgba(50, 184, 198, 0.2);
         }
 
-        @keyframes fillIn {
-            from {
-                transform: scale(0.5);
-                opacity: 0;
-            }
-            to {
-                transform: scale(1);
-                opacity: 1;
-            }
+        .tracker-square.banked::after {
+            content: '★';
+            font-weight: 700;
         }
 
         .daily-bars {
             display: grid;
             grid-template-columns: repeat(7, 1fr);
-            gap: 12px;
-            margin: 25px 0;
+            gap: 8px;
+            margin: 24px 0;
         }
 
         .day-container {
@@ -120,456 +135,453 @@
         }
 
         .day-label {
-            font-weight: bold;
-            color: #2c3e50;
+            font-size: 12px;
+            color: var(--color-text-secondary);
             margin-bottom: 8px;
-            font-size: 0.9em;
+            font-weight: 500;
         }
 
         .day-bar {
-            height: 150px;
-            background: #ecf0f1;
-            border-radius: 6px;
+            background-color: rgba(119, 124, 124, 0.2);
+            border-radius: 8px;
+            height: 100px;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            align-items: center;
+            padding-bottom: 4px;
             overflow: hidden;
-            position: relative;
-            border: 2px solid #bdc3c7;
         }
 
         .day-bar-fill {
-            height: 100%;
-            background: linear-gradient(to top, #667eea, #764ba2);
-            transition: height 0.5s ease;
-            border-radius: 4px;
+            background: linear-gradient(180deg, #2da6b2, #218089);
+            width: 100%;
+            border-radius: 8px 8px 0 0;
+            transition: height 0.3s ease-out;
             display: flex;
             align-items: flex-end;
             justify-content: center;
+            font-size: 11px;
+            font-weight: 600;
+            color: #262828;
+            min-height: 4px;
         }
 
         .day-units {
-            font-weight: bold;
-            color: #2c3e50;
-            margin-top: 8px;
-            font-size: 1.1em;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--color-text);
+            margin-top: 4px;
         }
 
         .status-section {
             text-align: center;
-            padding: 20px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border-radius: 8px;
+            padding: 20px 0;
+            border-top: 1px solid var(--color-border);
+            border-bottom: 1px solid var(--color-border);
             margin: 20px 0;
-            color: white;
         }
 
-        .status-icon {
-            font-size: 3em;
-            margin-bottom: 10px;
+        .status-indicator {
+            font-size: 48px;
+            margin-bottom: 8px;
         }
 
         .status-text {
-            font-size: 1.5em;
-            font-weight: bold;
+            font-size: 18px;
+            font-weight: 600;
         }
 
         .progress-section {
             margin: 20px 0;
-            display: none;
+            padding: 16px 0;
+            border-top: 1px solid var(--color-border);
+            border-bottom: 1px solid var(--color-border);
         }
 
         .progress-bar-container {
-            background: #ecf0f1;
-            height: 40px;
-            border-radius: 8px;
-            overflow: hidden;
-            margin-bottom: 15px;
-            position: relative;
+            margin-bottom: 16px;
+        }
+
+        .progress-bar-label {
+            font-size: 12px;
+            color: var(--color-text-secondary);
+            margin-bottom: 6px;
+            display: flex;
+            justify-content: space-between;
         }
 
         .progress-bar {
+            width: 100%;
+            height: 8px;
+            background-color: rgba(119, 124, 124, 0.2);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-bar-fill {
             height: 100%;
-            background: linear-gradient(to right, #667eea, #764ba2);
+            background: linear-gradient(90deg, #32b8c6, #2da6b2);
+            border-radius: 4px;
+            transition: width 0.3s ease-out;
+        }
+
+        .history-controls {
             display: flex;
-            align-items: center;
             justify-content: center;
-            color: white;
-            font-weight: bold;
-            transition: width 0.5s ease;
+            gap: 12px;
+            margin: 20px 0;
+        }
+
+        .history-btn {
+            padding: 8px 16px;
+            background-color: rgba(119, 124, 124, 0.2);
+            border: 1px solid var(--color-border);
+            color: var(--color-text);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .history-btn:hover:not(:disabled) {
+            background-color: rgba(119, 124, 124, 0.3);
+        }
+
+        .history-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+
+        .sparkline-section {
+            margin: 20px 0;
+            padding: 16px 0;
+            border-top: 1px solid var(--color-border);
+        }
+
+        .sparkline-label {
+            font-size: 12px;
+            color: var(--color-text-secondary);
+            margin-bottom: 8px;
+            font-weight: 500;
         }
 
         .sparkline {
             display: flex;
             align-items: flex-end;
+            justify-content: center;
             gap: 4px;
-            height: 60px;
-            margin: 20px 0;
+            height: 40px;
         }
 
         .sparkline-bar {
-            flex: 1;
-            background: linear-gradient(to top, #667eea, #764ba2);
-            border-radius: 3px;
-            transition: height 0.3s ease;
-            min-height: 5%;
+            width: 6px;
+            background: linear-gradient(180deg, #32b8c6, #2da6b2);
+            border-radius: 2px;
+            min-height: 2px;
+            transition: all 0.3s ease;
+        }
+
+        .last-updated {
+            text-align: center;
+            font-size: 11px;
+            color: var(--color-text-secondary);
+            margin-top: 12px;
         }
 
         .weekly-goals {
-            margin: 20px 0;
+            margin-top: 24px;
         }
 
-        .weekly-goals h3 {
-            color: #2c3e50;
-            margin-bottom: 15px;
+        .goals-help {
+            font-size: 13px;
+            color: var(--color-text-secondary);
+            margin-bottom: 16px;
         }
 
         .goal-row {
             display: flex;
             align-items: center;
-            margin-bottom: 12px;
-            padding: 10px;
-            background: #f8f9fa;
-            border-radius: 6px;
-            border: 1px solid #ecf0f1;
+            gap: 12px;
+            margin-bottom: 16px;
         }
 
         .goal-checkbox {
-            width: 24px;
-            height: 24px;
-            margin-right: 12px;
+            width: 36px;
+            height: 36px;
             cursor: pointer;
-            accent-color: #667eea;
+            flex-shrink: 0;
+            accent-color: var(--color-primary);
+            -webkit-appearance: none;
+            appearance: none;
+            border: 3px solid var(--color-border);
+            border-radius: 8px;
+            background-color: var(--color-bg);
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .goal-checkbox:hover {
+            border-color: var(--color-primary);
+            background-color: rgba(50, 184, 198, 0.1);
+        }
+
+        .goal-checkbox:checked {
+            background-color: var(--color-primary);
+            border-color: var(--color-primary);
+        }
+
+        .goal-checkbox:checked::after {
+            content: '✓';
+            color: #262828;
+            font-weight: bold;
+            font-size: 20px;
         }
 
         .goal-input {
             flex: 1;
+            padding: 10px 12px;
+            background-color: transparent;
             border: none;
-            background: transparent;
-            font-size: 1em;
-            padding: 5px;
-            color: #2c3e50;
+            border-bottom: 2px solid var(--color-border);
+            color: var(--color-text);
+            font-size: 16px;
+            font-family: inherit;
+            transition: border-color 0.2s ease;
+        }
+
+        .goal-input:focus {
             outline: none;
+            border-bottom-color: var(--color-primary);
         }
 
         .goal-input::placeholder {
-            color: #bdc3c7;
+            color: var(--color-text-secondary);
         }
 
-        .settings {
-            margin-top: 30px;
+        .controls-section {
+            margin-top: 24px;
         }
 
-        .settings h3 {
-            color: #2c3e50;
-            margin-bottom: 15px;
+        .control-group {
+            margin-bottom: 16px;
         }
 
-        .setting-group {
-            margin-bottom: 15px;
-        }
-
-        .setting-group label {
+        .control-label {
+            font-size: 12px;
+            color: var(--color-text-secondary);
+            margin-bottom: 6px;
             display: block;
-            color: #2c3e50;
             font-weight: 500;
-            margin-bottom: 8px;
         }
 
-        .setting-group select,
-        .setting-group input[type="number"] {
+        .control-input {
             width: 100%;
-            padding: 10px;
-            border: 2px solid #ecf0f1;
-            border-radius: 6px;
-            font-size: 1em;
-            color: #2c3e50;
+            padding: 10px 12px;
+            background-color: var(--color-bg);
+            border: 1px solid var(--color-border);
+            border-radius: 8px;
+            color: var(--color-text);
+            font-size: 14px;
         }
 
-        .setting-group select:focus,
-        .setting-group input[type="number"]:focus {
-            border-color: #667eea;
-            outline: none;
+        .checkbox-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .checkbox-wrapper input {
+            cursor: pointer;
         }
 
         .button-group {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 12px;
-            margin-top: 15px;
+            margin-top: 20px;
         }
 
-        button {
-            padding: 12px 24px;
+        .btn {
+            padding: 12px 16px;
             border: none;
-            border-radius: 6px;
-            font-size: 1em;
-            font-weight: bold;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
             cursor: pointer;
-            transition: all 0.3s ease;
+            transition: all 0.2s ease;
         }
 
-        button.primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+        .btn-primary {
+            background-color: var(--color-primary);
+            color: #262828;
         }
 
-        button.primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        .btn-primary:hover {
+            background-color: var(--color-primary-hover);
         }
 
-        button.secondary {
-            background: #ecf0f1;
-            color: #2c3e50;
-        }
-
-        button.secondary:hover {
-            background: #d5dbdb;
-        }
-
-        .nav-buttons {
-            display: flex;
-            gap: 12px;
-            justify-content: center;
-            margin: 20px 0;
-        }
-
-        .message-container {
-            margin: 10px 0;
-            min-height: 30px;
+        .btn-secondary {
+            background-color: rgba(119, 124, 124, 0.2);
+            color: var(--color-text);
+            border: 1px solid var(--color-border);
         }
 
         .success-message {
-            background: #d4edda;
-            color: #155724;
+            background-color: rgba(52, 211, 153, 0.1);
+            border: 1px solid var(--color-success);
+            color: var(--color-success);
             padding: 12px 16px;
-            border-radius: 6px;
-            border-left: 4px solid #28a745;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
         }
 
         .error-message {
-            background: #f8d7da;
-            color: #721c24;
+            background-color: rgba(255, 84, 89, 0.1);
+            border: 1px solid #ff5459;
+            color: #ff5459;
             padding: 12px 16px;
-            border-radius: 6px;
-            border-left: 4px solid #f5576c;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
         }
 
-        .last-updated {
-            text-align: center;
-            color: #7f8c8d;
-            font-size: 0.9em;
-            margin-top: 15px;
-        }
-
-        #customTargetGroup {
-            display: none;
+        @media (prefers-color-scheme: light) {
+            :root {
+                --color-bg: #fcfcf9;
+                --color-surface: #fffff5;
+                --color-text: #134252;
+                --color-text-secondary: #626c71;
+                --color-primary: #218089;
+                --color-primary-hover: #1a6a73;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🎯 FocusMate Tracker</h1>
+        <div class="header">
+            <h1>FocusMate Tracker</h1>
+        </div>
 
-        <!-- Main Tracker Card -->
+        <div id="messageContainer"></div>
+
         <div class="card">
-            <div class="week-header">
-                <h2 id="weekHeader">Week 2 (Jan 12-Jan 18)</h2>
-                <p id="weekSubheader">Completed: 30/40</p>
+            <div class="week-summary">
+                <div class="week-header" id="weekHeader">Week 1 (Jan 5-11)</div>
+                <div class="week-subheader" id="weekSubheader">Completed: 0/40</div>
             </div>
 
-            <div id="trackerGrid" class="tracker-grid"></div>
+            <div class="tracker-grid" id="trackerGrid"></div>
 
             <div class="daily-bars" id="dailyBars"></div>
 
             <div class="status-section">
-                <div class="status-icon" id="statusIcon">🟡</div>
-                <div class="status-text" id="statusText">Getting there 💪</div>
+                <div class="status-indicator" id="statusIcon">🔴</div>
+                <div class="status-text" id="statusText">Behind</div>
             </div>
 
-            <div class="progress-section" id="progressSection">
+            <div class="progress-section" id="progressSection" style="display: none;">
                 <div class="progress-bar-container">
-                    <div class="progress-bar" id="progressCompletedBar" style="width: 0%">
+                    <div class="progress-bar-label">
+                        <span>Completed</span>
                         <span id="progressCompletedLabel">0/40</span>
                     </div>
+                    <div class="progress-bar">
+                        <div class="progress-bar-fill" id="progressCompletedBar" style="width: 0%"></div>
+                    </div>
                 </div>
                 <div class="progress-bar-container">
-                    <div class="progress-bar" id="progressBankedBar" style="width: 0%; background: linear-gradient(to right, #667eea, #764ba2);">
-                        <span id="progressBankedLabel">Banked: 0</span>
+                    <div class="progress-bar-label">
+                        <span>🏦 Banking for next week</span>
+                        <span id="progressBankedLabel">0</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-bar-fill" id="progressBankedBar" style="width: 0%; background: linear-gradient(90deg, rgba(50, 184, 198, 0.6), rgba(45, 166, 178, 0.6));"></div>
                     </div>
                 </div>
             </div>
 
-            <div class="nav-buttons">
-                <button class="secondary" id="prevWeekBtn">← Previous Week</button>
-                <button class="secondary" id="nextWeekBtn" style="display: none;">Next Week →</button>
+            <div class="history-controls">
+                <button class="history-btn" id="prevWeekBtn">◀ Previous Week</button>
+                <button class="history-btn" id="nextWeekBtn" style="display: none;">Next Week ▶</button>
             </div>
 
-            <p style="text-align: center; color: #7f8c8d; margin-top: 15px; font-size: 0.9em;">Last 8 weeks</p>
-            <div class="sparkline" id="sparkline"></div>
+            <div class="sparkline-section">
+                <div class="sparkline-label">Last 8 weeks</div>
+                <div class="sparkline" id="sparkline"></div>
+            </div>
 
-            <div class="last-updated" id="lastUpdated">Last updated: --:-- --</div>
+            <div class="last-updated" id="lastUpdated">Loading...</div>
         </div>
 
-        <!-- Weekly Goals Card -->
-        <div class="card">
-            <div class="weekly-goals">
-                <h3>📋 Weekly Focus (Top 3)</h3>
-                <p style="color: #7f8c8d; margin-bottom: 15px; font-size: 0.9em;">Pick up to three hard things to move the week forward.</p>
-                <div id="weeklyGoalsList"></div>
+        <div class="card weekly-goals">
+            <h2 style="font-size: 18px; margin-bottom: 8px;">Weekly Focus (Top 3)</h2>
+            <p class="goals-help">Pick up to three hard things to move the week forward.</p>
+            <div id="weeklyGoalsList"></div>
+        </div>
+
+        <div class="card controls-section">
+            <h2 style="font-size: 18px; margin-bottom: 16px;">Settings</h2>
+
+            <div class="control-group">
+                <label class="control-label">Timezone</label>
+                <select class="control-input" id="timezone">
+                    <option value="Asia/Bangkok">Bangkok (ICT)</option>
+                    <option value="Asia/Hong_Kong">Hong Kong (HKT)</option>
+                    <option value="Europe/London">London (GMT)</option>
+                    <option value="America/New_York">New York (EST)</option>
+                    <option value="Asia/Tokyo">Tokyo (JST)</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label class="checkbox-wrapper">
+                    <input type="checkbox" id="holidayToggle" />
+                    <span>Custom target</span>
+                </label>
+            </div>
+
+            <div class="control-group" id="customTargetGroup" style="display: none;">
+                <label class="control-label">Target units</label>
+                <input type="number" class="control-input" id="customTarget" min="1" max="40" value="20" />
+            </div>
+
+            <div class="button-group">
+                <button class="btn btn-primary" id="refreshBtn">Refresh Data</button>
+                <button class="btn btn-secondary" id="exportBtn">Export CSV</button>
             </div>
         </div>
-
-        <!-- Settings Card -->
-        <div class="card">
-            <div class="settings">
-                <h3>⚙️ Settings</h3>
-                
-                <div class="setting-group">
-                    <label for="timezone">Timezone</label>
-                    <select id="timezone">
-                        <option value="Asia/Bangkok">Bangkok (ICT)</option>
-                        <option value="Europe/London">London (GMT/BST)</option>
-                        <option value="America/New_York">New York (EST/EDT)</option>
-                        <option value="America/Los_Angeles">Los Angeles (PST/PDT)</option>
-                        <option value="Australia/Sydney">Sydney (AEDT/AEST)</option>
-                    </select>
-                </div>
-
-                <div class="setting-group">
-                    <label>
-                        <input type="checkbox" id="holidayToggle"> Custom target
-                    </label>
-                    <div id="customTargetGroup">
-                        <label for="customTarget">Target units per week</label>
-                        <input type="number" id="customTarget" min="1" max="40" value="40">
-                    </div>
-                </div>
-
-                <div class="button-group">
-                    <button class="primary" id="refreshBtn">🔄 Refresh Data</button>
-                    <button class="secondary" id="exportBtn">📥 Export CSV</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Message Container -->
-        <div id="messageContainer" class="message-container"></div>
     </div>
 
     <script>
         const TIMEZONE_STORAGE = 'focusmate_timezone';
         const WEEKS_STORAGE = 'focusmate_weeks';
         const WEEKLY_GOALS_STORAGE = 'focusmate_weekly_goals';
+        let refreshInterval;
         let currentViewingWeekOffset = 0;
         let allWeeksData = {};
         let allWeeklyGoals = {};
         let sessions = [];
 
-        // ========== SYNC WITH BLOB API ==========
-        async function loadStateFromBlob() {
-            console.log('🔄 Loading state from Blob API...');
-            try {
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
-
-                const response = await fetch('/api/state', { signal: controller.signal });
-                clearTimeout(timeoutId);
-
-                if (!response.ok) {
-                    console.warn('⚠️ API returned status', response.status);
-                    return false;
-                }
-
-                let state;
-                try {
-                    state = await response.json();
-                } catch (parseError) {
-                    console.warn('⚠️ Failed to parse JSON response:', parseError.message);
-                    return false;
-                }
-
-                // Validate state structure
-                if (!state || typeof state !== 'object') {
-                    console.warn('⚠️ Invalid state structure received');
-                    return false;
-                }
-
-                console.log('✅ Loaded from Blob:', {
-                    weeks: Object.keys(state.allWeeksData || {}),
-                    goals: Object.keys(state.allWeeklyGoals || {})
-                });
-
-                allWeeksData = state.allWeeksData || {};
-                allWeeklyGoals = state.allWeeklyGoals || {};
-                sessions = state.sessions || [];
-
-                // Also save to localStorage as backup
-                localStorage.setItem(WEEKS_STORAGE, JSON.stringify(allWeeksData));
-                localStorage.setItem(WEEKLY_GOALS_STORAGE, JSON.stringify(allWeeklyGoals));
-
-                return true;
-            } catch (error) {
-                console.warn('⚠️ Blob load failed:', error.message);
-                return false;
-            }
-        }
-
-        async function saveStateToBlob() {
-            console.log('💾 Saving state to Blob...');
-            try {
-                const response = await fetch('/api/state', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        allWeeksData,
-                        allWeeklyGoals,
-                        sessions,
-                        lastModified: new Date().toISOString()
-                    })
-                });
-
-                if (!response.ok) {
-                    console.warn('⚠️ POST failed, status:', response.status);
-                    return false;
-                }
-
-                console.log('✅ Saved to Blob');
-                return true;
-            } catch (error) {
-                console.warn('⚠️ Blob save failed:', error.message);
-                return false;
-            }
-        }
-
-        // ========== PAGE INITIALIZATION ==========
         document.addEventListener('DOMContentLoaded', async () => {
-            console.log('🚀 Page loading...');
             loadSettings();
-            
-            // Load from Blob first, fall back to localStorage
-            const blobLoaded = await loadStateFromBlob();
-            if (!blobLoaded) {
-                console.log('📌 Falling back to localStorage');
-                loadFromLocalStorage();
-            }
-
+            await loadStateFromAPI();
             generateTrackerGrid();
             generateDailyBars();
             generateSparkline();
             generateWeeklyGoals();
             attachEventListeners();
-            await fetchSessions();
-            updateLastUpdated();
-
-            // Auto-fetch sessions every 5 minutes
-            setInterval(fetchSessions, 5 * 60 * 1000);
-
-            // Auto-sync to Blob every 30 seconds
-            setInterval(saveStateToBlob, 30 * 1000);
-
-            console.log('✅ Page ready');
+            fetchSessions();
+            refreshInterval = setInterval(fetchSessions, 5 * 60 * 1000);
         });
 
-        // ========== UI GENERATION ==========
         function generateTrackerGrid() {
             const grid = document.getElementById('trackerGrid');
             grid.innerHTML = Array.from({ length: 40 }, (_, i) =>
@@ -638,28 +650,16 @@
 
             allWeeklyGoals[weekKey] = goals;
             localStorage.setItem(WEEKLY_GOALS_STORAGE, JSON.stringify(allWeeklyGoals));
-            saveStateToBlob();
-            console.log('📝 Goals saved');
+            saveStateToAPI();
         }
 
-        // ========== DATA LOADING ==========
-        function loadFromLocalStorage() {
-            const weeks = localStorage.getItem(WEEKS_STORAGE);
-            const goals = localStorage.getItem(WEEKLY_GOALS_STORAGE);
-
-            if (weeks) {
+        function loadAllWeeklyGoals() {
+            const stored = localStorage.getItem(WEEKLY_GOALS_STORAGE);
+            if (stored) {
                 try {
-                    allWeeksData = JSON.parse(weeks);
+                    allWeeklyGoals = JSON.parse(stored);
                 } catch (e) {
-                    console.warn('⚠️ Failed to parse weeks from localStorage');
-                }
-            }
-
-            if (goals) {
-                try {
-                    allWeeklyGoals = JSON.parse(goals);
-                } catch (e) {
-                    console.warn('⚠️ Failed to parse goals from localStorage');
+                    allWeeklyGoals = {};
                 }
             }
         }
@@ -699,18 +699,28 @@
             localStorage.setItem(TIMEZONE_STORAGE, document.getElementById('timezone').value);
         }
 
-        // ========== WEEK CALCULATION ==========
-        function getWeekNumber() {
-            const weekStart = new Date('2026-01-05T00:00:00Z');
-            const now = new Date();
-            
-            if (now < weekStart) {
-                return 1; // Before Week 1 started
+        function loadAllWeeksData() {
+            const stored = localStorage.getItem(WEEKS_STORAGE);
+            if (stored) {
+                try {
+                    allWeeksData = JSON.parse(stored);
+                } catch (e) {
+                    allWeeksData = {};
+                }
             }
-            
-            const diffTime = now.getTime() - weekStart.getTime();
+        }
+
+        function saveAllWeeksData() {
+            localStorage.setItem(WEEKS_STORAGE, JSON.stringify(allWeeksData));
+            saveStateToAPI();
+        }
+
+        function getWeekNumber() {
+            const weekStart = new Date('2026-01-05');
+            const now = new Date();
+            const diffTime = now - weekStart;
             const diffWeeks = Math.floor(diffTime / (7 * 24 * 60 * 60 * 1000));
-            return diffWeeks + 1;
+            return Math.max(1, diffWeeks + 1);
         }
 
         function getWeekData(timezone, weekOffset = 0) {
@@ -765,7 +775,6 @@
             }
         }
 
-        // ========== FETCH SESSIONS & PROCESS ==========
         async function fetchSessions() {
             if (currentViewingWeekOffset !== 0) return;
 
@@ -779,64 +788,33 @@
                 const startDate = weekData.weekStart.toISOString();
                 const endDate = new Date(weekData.weekStart.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
-                console.log(`🔄 Fetching Week ${weekData.weekNum} sessions...`);
-
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
-
                 const response = await fetch(
-                    `/api/focusmate?start=${encodeURIComponent(startDate)}&end=${encodeURIComponent(endDate)}`,
-                    { signal: controller.signal }
+                    `/api/focusmate?start=${encodeURIComponent(startDate)}&end=${encodeURIComponent(endDate)}`
                 );
-                clearTimeout(timeoutId);
 
                 if (!response.ok) {
-                    console.warn('⚠️ FocusMate API error - using stored data');
-                    showFromStorage(targetUnits, weekData.weekNum);
-                    updateLastUpdated();
-                    return;
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || `API returned ${response.status}`);
                 }
 
-                let data;
-                try {
-                    data = await response.json();
-                } catch (parseError) {
-                    console.warn('⚠️ Failed to parse API response:', parseError);
-                    showFromStorage(targetUnits, weekData.weekNum);
-                    updateLastUpdated();
-                    return;
-                }
+                const data = await response.json();
 
                 if (!data.sessions || data.sessions.length === 0) {
-                    console.log('⚠️ No sessions from API - using stored data');
-                    showFromStorage(targetUnits, weekData.weekNum);
+                    processSessionData([], timezone, targetUnits, weekData.weekNum);
                     updateLastUpdated();
                     return;
                 }
 
-                // FIX: Count ALL sessions, not just 2+ user sessions
-                const filteredSessions = data.sessions;
-                sessions = filteredSessions;
+                // Save sessions to state for cross-device sync
+                sessions = data.sessions;
 
-                processSessionData(filteredSessions, timezone, targetUnits, weekData.weekNum);
-                showSuccess(`✓ ${filteredSessions.length} sessions`);
+                processSessionData(data.sessions, timezone, targetUnits, weekData.weekNum);
+                showSuccess(`Loaded ${data.sessions.length} sessions`);
                 updateLastUpdated();
             } catch (error) {
-                console.warn('⚠️ API failed:', error.message);
-                const weekData = getWeekData(timezone);
-                showFromStorage(targetUnits, weekData.weekNum);
+                console.error('Fetch error:', error);
+                showError(`API Error: ${error.message}`);
                 updateLastUpdated();
-            }
-        }
-
-        function showFromStorage(targetUnits, weekNum) {
-            const weekKey = `week_${weekNum}`;
-            if (allWeeksData[weekKey]) {
-                const data = allWeeksData[weekKey];
-                updateUI(data.completed, data.target, data.dailyUnits, weekNum, data.bankedFromPrevious, data.bankedForNextWeek);
-                updateSparkline();
-            } else {
-                updateUI(0, targetUnits, { Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0, Sun: 0 }, weekNum, 0, 0);
             }
         }
 
@@ -846,31 +824,20 @@
             let dailyUnits = { Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0, Sun: 0 };
 
             sessionsData.forEach(session => {
-                if (!session.startTime || !session.duration) {
-                    console.warn('⚠️ Skipping session with missing time/duration');
-                    return;
+                if (session.startTime && session.duration) {
+                    const sessionDate = new Date(session.startTime);
+                    const diff = Math.floor((sessionDate - weekData.weekStart) / (1000 * 60 * 60 * 24));
+                    if (diff >= 0 && diff < 7) {
+                        const durationMinutes = session.duration / (1000 * 60);
+                        if (durationMinutes < 15) return;
+                        const units = Math.round(durationMinutes / 25);
+                        const dayName = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][diff];
+                        if (dayName) {
+                            dailyUnits[dayName] += units;
+                            totalUnits += units;
+                        }
+                    }
                 }
-
-                const sessionDate = new Date(session.startTime);
-                const diff = Math.floor((sessionDate - weekData.weekStart) / (1000 * 60 * 60 * 24));
-
-                if (diff < 0 || diff > 6) {
-                    console.warn(`⚠️ Session on day ${diff} (outside week range)`);
-                    return;
-                }
-
-                const durationMinutes = session.duration / (1000 * 60);
-                if (durationMinutes < 15) return; // Filter false starts
-                const units = Math.round(durationMinutes / 25);
-                const dayName = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][diff];
-
-                if (!dayName) {
-                    console.warn('⚠️ Invalid day index:', diff);
-                    return;
-                }
-
-                dailyUnits[dayName] += units;
-                totalUnits += units;
             });
 
             const prevWeekKey = `week_${weekNum - 1}`;
@@ -889,9 +856,7 @@
                 surplus,
                 bankedForNextWeek: bankedForNext
             };
-
-            localStorage.setItem(WEEKS_STORAGE, JSON.stringify(allWeeksData));
-            saveStateToBlob();
+            saveAllWeeksData();
 
             updateUI(totalUnits, targetUnits, dailyUnits, weekNum, bankedFromPrevious, bankedForNext);
             updateSparkline();
@@ -921,7 +886,6 @@
                     sq.classList.remove('filled', 'banked');
                     if (i <= bankedFromPrevious) {
                         sq.classList.add('banked');
-                        sq.textContent = '⭐';
                         sq.style.transitionDelay = `${(i - 1) * 0.05}s`;
                     } else if (i <= bankedFromPrevious + filledCount) {
                         sq.classList.add('filled');
@@ -1021,6 +985,168 @@
             const container = document.getElementById('messageContainer');
             container.innerHTML = `<div class="error-message">${msg}</div>`;
             setTimeout(() => { container.innerHTML = ''; }, 5000);
+        }
+
+        // ===== API SYNC FUNCTIONS =====
+        
+        function recalculateWeeksFromSessions() {
+            if (!sessions || sessions.length === 0) {
+                console.log('📊 No sessions to recalculate');
+                return;
+            }
+
+            console.log('🔄 Recalculating weeks from', sessions.length, 'sessions...');
+            const timezone = document.getElementById('timezone').value || 'Asia/Bangkok';
+            
+            // Clear old week data
+            const newWeeksData = {};
+            
+            sessions.forEach(session => {
+                if (session.startTime && session.duration) {
+                    const sessionDate = new Date(session.startTime);
+                    const weekStart = new Date('2026-01-05');
+                    const diff = Math.floor((sessionDate - weekStart) / (1000 * 60 * 60 * 24));
+                    const weekNum = Math.floor(diff / 7) + 1;
+                    
+                    if (weekNum >= 1) {
+                        const weekKey = `week_${weekNum}`;
+                        
+                        if (!newWeeksData[weekKey]) {
+                            newWeeksData[weekKey] = {
+                                weekNum,
+                                weekStart: new Date(weekStart.getTime() + (weekNum - 1) * 7 * 24 * 60 * 60 * 1000).toISOString(),
+                                completed: 0,
+                                target: 40,
+                                dailyUnits: { Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0, Sun: 0 },
+                                bankedFromPrevious: 0,
+                                surplus: 0,
+                                bankedForNextWeek: 0
+                            };
+                        }
+                        
+                        const durationMinutes = session.duration / (1000 * 60);
+                        if (durationMinutes < 15) return;
+                        const units = Math.round(durationMinutes / 25);
+                        const dayName = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][diff % 7];
+                        
+                        if (dayName) {
+                            newWeeksData[weekKey].dailyUnits[dayName] += units;
+                            newWeeksData[weekKey].completed += units;
+                        }
+                    }
+                }
+            });
+            
+            // Calculate banking for each week
+            const sortedWeeks = Object.keys(newWeeksData).sort((a, b) => {
+                const weekA = parseInt(a.split('_')[1]);
+                const weekB = parseInt(b.split('_')[1]);
+                return weekA - weekB;
+            });
+            
+            sortedWeeks.forEach((weekKey, idx) => {
+                const week = newWeeksData[weekKey];
+                const prevWeekKey = idx > 0 ? sortedWeeks[idx - 1] : null;
+                
+                if (prevWeekKey) {
+                    const prevWeek = newWeeksData[prevWeekKey];
+                    week.bankedFromPrevious = prevWeek.bankedForNextWeek;
+                } else {
+                    week.bankedFromPrevious = 0;
+                }
+                
+                week.surplus = Math.max(0, week.completed - week.target);
+                week.bankedForNextWeek = week.bankedFromPrevious + week.surplus;
+            });
+            
+            // Merge with existing data (don't overwrite current week if it has manual entries)
+            allWeeksData = { ...newWeeksData, ...allWeeksData };
+            
+            console.log('✅ Recalculated', Object.keys(allWeeksData).length, 'weeks from sessions');
+        }
+
+        async function loadStateFromAPI() {
+            try {
+                console.log('🔍 Starting loadStateFromAPI');
+
+                const response = await fetch('/api/state');
+                console.log('🔍 /api/state response status:', response.status);
+
+                if (!response.ok) {
+                    throw new Error(`API returned ${response.status}`);
+                }
+
+                const state = await response.json();
+                console.log('🔍 /api/state response:', state);
+                console.log('🔍 allWeeksData keys in response:', Object.keys(state.allWeeksData || {}));
+
+                // ALWAYS use API response as source of truth (even if empty)
+                // This ensures cross-device sync works
+                allWeeksData = state.allWeeksData || {};
+                allWeeklyGoals = state.allWeeklyGoals || {};
+                sessions = state.sessions || [];
+
+                console.log('✅ Loaded from API - allWeeksData:', allWeeksData);
+                console.log('✅ Loaded from API - allWeeklyGoals:', allWeeklyGoals);
+                console.log('✅ Loaded from API - sessions:', sessions.length, 'sessions');
+
+                // RECALCULATE WEEKS FROM SESSIONS
+                recalculateWeeksFromSessions();
+
+                // If API response is empty, also load from localStorage as secondary source
+                if (Object.keys(allWeeksData).length === 0) {
+                    const localWeeks = localStorage.getItem(WEEKS_STORAGE);
+                    if (localWeeks) {
+                        try {
+                            allWeeksData = JSON.parse(localWeeks);
+                            console.log('📱 Also loaded allWeeksData from localStorage backup');
+                        } catch (e) {
+                            console.log('Could not parse localStorage weeks');
+                        }
+                    }
+                }
+
+                if (Object.keys(allWeeklyGoals).length === 0) {
+                    const localGoals = localStorage.getItem(WEEKLY_GOALS_STORAGE);
+                    if (localGoals) {
+                        try {
+                            allWeeklyGoals = JSON.parse(localGoals);
+                            console.log('📱 Also loaded allWeeklyGoals from localStorage backup');
+                        } catch (e) {
+                            console.log('Could not parse localStorage goals');
+                        }
+                    }
+                }
+
+            } catch (error) {
+                console.error('❌ Failed to load from API:', error);
+                console.log('Falling back to localStorage only');
+                loadAllWeeksData();
+                loadAllWeeklyGoals();
+            }
+        }
+
+        async function saveStateToAPI() {
+            try {
+                const response = await fetch('/api/state', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        allWeeksData,
+                        allWeeklyGoals,
+                        sessions,
+                        lastModified: new Date().toISOString()
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`API error: ${response.status}`);
+                }
+
+                console.log('💾 State saved to API');
+            } catch (error) {
+                console.error('❌ Failed to save to API:', error);
+            }
         }
     </script>
 </body>
