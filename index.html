@@ -469,7 +469,7 @@
             console.log('🔄 Loading state from Blob API...');
             try {
                 const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout for cold starts
+                const timeoutId = setTimeout(() => controller.abort(), 5000); // 5s timeout
 
                 const response = await fetch('/api/state', { signal: controller.signal });
                 clearTimeout(timeoutId);
@@ -540,87 +540,16 @@
             }
         }
 
-        // Track when local data was last modified by user action
-        let localLastModified = null;
-
-        async function syncWithBlob() {
-            try {
-                // Load remote state
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 5000);
-                const response = await fetch('/api/state', { signal: controller.signal });
-                clearTimeout(timeoutId);
-
-                if (response.ok) {
-                    const remoteState = await response.json();
-                    if (remoteState && remoteState.lastModified) {
-                        const remoteTime = new Date(remoteState.lastModified).getTime();
-                        const localTime = localLastModified ? new Date(localLastModified).getTime() : 0;
-
-                        if (remoteTime > localTime) {
-                            // Remote is newer - adopt remote data
-                            console.log('Sync: remote is newer, updating local');
-                            allWeeksData = remoteState.allWeeksData || {};
-                            allWeeklyGoals = remoteState.allWeeklyGoals || {};
-                            sessions = remoteState.sessions || [];
-                            localStorage.setItem(WEEKS_STORAGE, JSON.stringify(allWeeksData));
-                            localStorage.setItem(WEEKLY_GOALS_STORAGE, JSON.stringify(allWeeklyGoals));
-                            // Refresh UI with updated data
-                            if (currentViewingWeekOffset === 0) {
-                                const timezone = document.getElementById('timezone').value;
-                                const weekData = getWeekData(timezone);
-                                const weekKey = `week_${weekData.weekNum}`;
-                                if (allWeeksData[weekKey]) {
-                                    const data = allWeeksData[weekKey];
-                                    updateUI(data.completed, data.target, data.dailyUnits, weekData.weekNum, data.bankedFromPrevious, data.bankedForNextWeek);
-                                }
-                            }
-                            generateWeeklyGoals();
-                            return;
-                        }
-                    }
-                }
-            } catch (e) {
-                // Ignore sync load failures
-            }
-
-            // Local is newer or remote failed - save local state
-            await saveStateToBlob();
-        }
-
         // ========== PAGE INITIALIZATION ==========
         document.addEventListener('DOMContentLoaded', async () => {
             console.log('🚀 Page loading...');
             loadSettings();
-
-            // Always load localStorage first as baseline
-            loadFromLocalStorage();
-            const localWeeks = { ...allWeeksData };
-            const localGoals = { ...allWeeklyGoals };
-
-            // Then load from Blob and merge (Blob may have data from other platforms)
+            
+            // Load from Blob first, fall back to localStorage
             const blobLoaded = await loadStateFromBlob();
-            if (blobLoaded) {
-                // Merge: for each week, keep the entry with more completed sessions
-                for (const key of Object.keys(localWeeks)) {
-                    if (!allWeeksData[key] || (localWeeks[key].completed > (allWeeksData[key].completed || 0))) {
-                        allWeeksData[key] = localWeeks[key];
-                    }
-                }
-                // Merge goals: keep non-empty goals from either source
-                for (const key of Object.keys(localGoals)) {
-                    const localG = localGoals[key] || [];
-                    const blobG = allWeeklyGoals[key] || [];
-                    const localHasContent = localG.some(g => g.text && g.text.trim());
-                    const blobHasContent = blobG.some(g => g.text && g.text.trim());
-                    if (localHasContent && !blobHasContent) {
-                        allWeeklyGoals[key] = localG;
-                    }
-                }
-                // Save merged state back
-                localStorage.setItem(WEEKS_STORAGE, JSON.stringify(allWeeksData));
-                localStorage.setItem(WEEKLY_GOALS_STORAGE, JSON.stringify(allWeeklyGoals));
-                saveStateToBlob();
+            if (!blobLoaded) {
+                console.log('📌 Falling back to localStorage');
+                loadFromLocalStorage();
             }
 
             generateTrackerGrid();
@@ -628,18 +557,14 @@
             generateSparkline();
             generateWeeklyGoals();
             attachEventListeners();
-
-            // Backfill historical weeks to rebuild banking chain
-            await backfillHistoricalWeeks();
-
             await fetchSessions();
             updateLastUpdated();
 
             // Auto-fetch sessions every 5 minutes
             setInterval(fetchSessions, 5 * 60 * 1000);
 
-            // Bidirectional sync with Blob every 30 seconds
-            setInterval(syncWithBlob, 30 * 1000);
+            // Auto-sync to Blob every 30 seconds
+            setInterval(saveStateToBlob, 30 * 1000);
 
             console.log('✅ Page ready');
         });
@@ -713,7 +638,6 @@
 
             allWeeklyGoals[weekKey] = goals;
             localStorage.setItem(WEEKLY_GOALS_STORAGE, JSON.stringify(allWeeklyGoals));
-            localLastModified = new Date().toISOString();
             saveStateToBlob();
             console.log('📝 Goals saved');
         }
@@ -905,104 +829,6 @@
             }
         }
 
-        // ========== HISTORICAL BACKFILL ==========
-        async function backfillHistoricalWeeks() {
-            const currentWeek = getWeekNumber();
-            if (currentWeek <= 1) return;
-
-            console.log(`🔄 Backfilling weeks 1-${currentWeek}...`);
-            const programStart = new Date('2026-01-05T00:00:00Z');
-
-            for (let wk = 1; wk <= currentWeek; wk++) {
-                const weekKey = `week_${wk}`;
-                const existing = allWeeksData[weekKey];
-
-                // Skip if we already have full data with banking calculated
-                if (existing && existing.completed > 0 && existing.bankedForNextWeek !== undefined) {
-                    // Recalculate banking chain from previous week
-                    const prevKey = `week_${wk - 1}`;
-                    const bankedFromPrevious = wk > 1 && allWeeksData[prevKey] ? allWeeksData[prevKey].bankedForNextWeek : 0;
-                    const target = existing.target || 40;
-                    const surplus = Math.max(0, existing.completed - target);
-                    existing.bankedFromPrevious = bankedFromPrevious;
-                    existing.surplus = surplus;
-                    existing.bankedForNextWeek = bankedFromPrevious + surplus;
-                    allWeeksData[weekKey] = existing;
-                    continue;
-                }
-
-                // Fetch sessions for this week from FocusMate API
-                const weekStart = new Date(programStart.getTime() + (wk - 1) * 7 * 24 * 60 * 60 * 1000);
-                const weekEnd = new Date(weekStart.getTime() + 7 * 24 * 60 * 60 * 1000);
-
-                try {
-                    const response = await fetch(
-                        `/api/focusmate?start=${encodeURIComponent(weekStart.toISOString())}&end=${encodeURIComponent(weekEnd.toISOString())}`
-                    );
-                    if (!response.ok) continue;
-
-                    const data = await response.json();
-                    if (!data.sessions || data.sessions.length === 0) {
-                        // No sessions - still set up banking chain
-                        const prevKey = `week_${wk - 1}`;
-                        const bankedFromPrevious = wk > 1 && allWeeksData[prevKey] ? allWeeksData[prevKey].bankedForNextWeek : 0;
-                        allWeeksData[weekKey] = {
-                            weekNum: wk,
-                            weekStart: weekStart.toISOString(),
-                            completed: 0,
-                            target: 40,
-                            dailyUnits: { Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0, Sun: 0 },
-                            bankedFromPrevious,
-                            surplus: 0,
-                            bankedForNextWeek: bankedFromPrevious
-                        };
-                        continue;
-                    }
-
-                    let totalUnits = 0;
-                    let dailyUnits = { Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0, Sun: 0 };
-
-                    data.sessions.forEach(session => {
-                        if (!session.startTime || !session.duration) return;
-                        const sessionDate = new Date(session.startTime);
-                        const diff = Math.floor((sessionDate - weekStart) / (1000 * 60 * 60 * 24));
-                        if (diff < 0 || diff > 6) return;
-                        const durationMinutes = session.duration / (1000 * 60);
-                        if (durationMinutes < 15) return;
-                        const units = Math.round(durationMinutes / 25);
-                        const dayName = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][diff];
-                        if (!dayName) return;
-                        dailyUnits[dayName] += units;
-                        totalUnits += units;
-                    });
-
-                    const prevKey = `week_${wk - 1}`;
-                    const bankedFromPrevious = wk > 1 && allWeeksData[prevKey] ? allWeeksData[prevKey].bankedForNextWeek : 0;
-                    const target = 40;
-                    const surplus = Math.max(0, totalUnits - target);
-                    const bankedForNext = bankedFromPrevious + surplus;
-
-                    allWeeksData[weekKey] = {
-                        weekNum: wk,
-                        weekStart: weekStart.toISOString(),
-                        completed: totalUnits,
-                        target,
-                        dailyUnits,
-                        bankedFromPrevious,
-                        surplus,
-                        bankedForNextWeek: bankedForNext
-                    };
-                } catch (e) {
-                    console.warn(`⚠️ Backfill failed for week ${wk}:`, e.message);
-                }
-            }
-
-            localStorage.setItem(WEEKS_STORAGE, JSON.stringify(allWeeksData));
-            localLastModified = new Date().toISOString();
-            saveStateToBlob();
-            console.log('✅ Backfill complete');
-        }
-
         function showFromStorage(targetUnits, weekNum) {
             const weekKey = `week_${weekNum}`;
             if (allWeeksData[weekKey]) {
@@ -1065,7 +891,6 @@
             };
 
             localStorage.setItem(WEEKS_STORAGE, JSON.stringify(allWeeksData));
-            localLastModified = new Date().toISOString();
             saveStateToBlob();
 
             updateUI(totalUnits, targetUnits, dailyUnits, weekNum, bankedFromPrevious, bankedForNext);
@@ -1077,6 +902,7 @@
         }
 
         function updateUI(units, target, dailyUnits, weekNum, bankedFromPrevious = 0, bankedForNext = 0) {
+            const unitsNeeded = Math.max(0, target - bankedFromPrevious);
             const filledCount = Math.min(units, target);
             const totalDisplayed = bankedFromPrevious + units;
 
@@ -1131,7 +957,7 @@
                 text.textContent = 'Keep going 🚀';
             }
 
-            const surplus = Math.max(0, units - target);
+            const surplus = Math.max(0, units - unitsNeeded);
             const progressSection = document.getElementById('progressSection');
             if (surplus > 0 && currentViewingWeekOffset === 0) {
                 progressSection.style.display = 'block';
