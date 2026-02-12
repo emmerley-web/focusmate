@@ -111,18 +111,6 @@
             font-weight: 700;
         }
 
-        .tracker-square.banked {
-            background: linear-gradient(135deg, rgba(50, 184, 198, 0.5), rgba(45, 166, 178, 0.5));
-            border-color: rgba(50, 184, 198, 0.6);
-            color: #262828;
-            box-shadow: 0 0 8px rgba(50, 184, 198, 0.2);
-        }
-
-        .tracker-square.banked::after {
-            content: '★';
-            font-weight: 700;
-        }
-
         .daily-bars {
             display: grid;
             grid-template-columns: repeat(7, 1fr);
@@ -497,15 +485,6 @@
                         <div class="progress-bar-fill" id="progressCompletedBar" style="width: 0%"></div>
                     </div>
                 </div>
-                <div class="progress-bar-container">
-                    <div class="progress-bar-label">
-                        <span>🏦 Banking for next week</span>
-                        <span id="progressBankedLabel">0</span>
-                    </div>
-                    <div class="progress-bar">
-                        <div class="progress-bar-fill" id="progressBankedBar" style="width: 0%; background: linear-gradient(90deg, rgba(50, 184, 198, 0.6), rgba(45, 166, 178, 0.6));"></div>
-                    </div>
-                </div>
             </div>
 
             <div class="history-controls">
@@ -840,36 +819,26 @@
                 }
             });
 
-            const prevWeekKey = `week_${weekNum - 1}`;
-            const bankedFromPrevious = allWeeksData[prevWeekKey] ? allWeeksData[prevWeekKey].bankedForNextWeek : 0;
-            const surplus = Math.max(0, totalUnits - targetUnits);
-            const bankedForNext = bankedFromPrevious + surplus;
-
             const weekKey = `week_${weekNum}`;
             allWeeksData[weekKey] = {
                 weekNum,
                 weekStart: weekData.weekStart.toISOString(),
                 completed: totalUnits,
                 target: targetUnits,
-                dailyUnits,
-                bankedFromPrevious,
-                surplus,
-                bankedForNextWeek: bankedForNext
+                dailyUnits
             };
             saveAllWeeksData();
 
-            updateUI(totalUnits, targetUnits, dailyUnits, weekNum, bankedFromPrevious, bankedForNext);
+            updateUI(totalUnits, targetUnits, dailyUnits, weekNum);
             updateSparkline();
         }
 
         function updateUIFromHistory(weekData, weekNum, targetUnits) {
-            updateUI(weekData.completed, targetUnits, weekData.dailyUnits, weekNum, weekData.bankedFromPrevious, weekData.bankedForNextWeek);
+            updateUI(weekData.completed, targetUnits, weekData.dailyUnits, weekNum);
         }
 
-        function updateUI(units, target, dailyUnits, weekNum, bankedFromPrevious = 0, bankedForNext = 0) {
-            const unitsNeeded = Math.max(0, target - bankedFromPrevious);
+        function updateUI(units, target, dailyUnits, weekNum) {
             const filledCount = Math.min(units, target);
-            const totalDisplayed = bankedFromPrevious + units;
 
             const weekStart = new Date('2026-01-05');
             weekStart.setDate(weekStart.getDate() + (weekNum - 1) * 7);
@@ -878,16 +847,13 @@
             const dateStr = `${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}-${weekEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
 
             document.getElementById('weekHeader').textContent = `Week ${weekNum} (${dateStr})`;
-            document.getElementById('weekSubheader').textContent = `Completed: ${totalDisplayed}/${target}`;
+            document.getElementById('weekSubheader').textContent = `Completed: ${units}/${target}`;
 
             for (let i = 1; i <= 40; i++) {
                 const sq = document.querySelector(`.tracker-square[data-unit="${i}"]`);
                 if (sq) {
-                    sq.classList.remove('filled', 'banked');
-                    if (i <= bankedFromPrevious) {
-                        sq.classList.add('banked');
-                        sq.style.transitionDelay = `${(i - 1) * 0.05}s`;
-                    } else if (i <= bankedFromPrevious + filledCount) {
+                    sq.classList.remove('filled');
+                    if (i <= filledCount) {
                         sq.classList.add('filled');
                         sq.style.transitionDelay = `${(i - 1) * 0.05}s`;
                     }
@@ -904,7 +870,7 @@
                 if (dayText) dayText.textContent = dayU;
             });
 
-            const pct = (totalDisplayed / target) * 100;
+            const pct = (units / target) * 100;
             const icon = document.getElementById('statusIcon');
             const text = document.getElementById('statusText');
             if (pct >= 100) {
@@ -921,16 +887,12 @@
                 text.textContent = 'Keep going 🚀';
             }
 
-            const surplus = Math.max(0, units - unitsNeeded);
             const progressSection = document.getElementById('progressSection');
-            if (surplus > 0 && currentViewingWeekOffset === 0) {
+            if (units > 0 && currentViewingWeekOffset === 0) {
                 progressSection.style.display = 'block';
-                const completedPct = (totalDisplayed / target) * 100;
-                const bankedPct = (bankedForNext / target) * 100;
+                const completedPct = (units / target) * 100;
                 document.getElementById('progressCompletedBar').style.width = `${Math.min(completedPct, 100)}%`;
-                document.getElementById('progressCompletedLabel').textContent = `${totalDisplayed}/${target}`;
-                document.getElementById('progressBankedBar').style.width = `${Math.min(bankedPct, 100)}%`;
-                document.getElementById('progressBankedLabel').textContent = `${bankedForNext}`;
+                document.getElementById('progressCompletedLabel').textContent = `${units}/${target}`;
             } else {
                 progressSection.style.display = 'none';
             }
@@ -1017,10 +979,7 @@
                                 weekStart: new Date(weekStart.getTime() + (weekNum - 1) * 7 * 24 * 60 * 60 * 1000).toISOString(),
                                 completed: 0,
                                 target: 40,
-                                dailyUnits: { Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0, Sun: 0 },
-                                bankedFromPrevious: 0,
-                                surplus: 0,
-                                bankedForNextWeek: 0
+                                dailyUnits: { Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0, Sun: 0 }
                             };
                         }
                         
@@ -1035,28 +994,6 @@
                         }
                     }
                 }
-            });
-            
-            // Calculate banking for each week
-            const sortedWeeks = Object.keys(newWeeksData).sort((a, b) => {
-                const weekA = parseInt(a.split('_')[1]);
-                const weekB = parseInt(b.split('_')[1]);
-                return weekA - weekB;
-            });
-            
-            sortedWeeks.forEach((weekKey, idx) => {
-                const week = newWeeksData[weekKey];
-                const prevWeekKey = idx > 0 ? sortedWeeks[idx - 1] : null;
-                
-                if (prevWeekKey) {
-                    const prevWeek = newWeeksData[prevWeekKey];
-                    week.bankedFromPrevious = prevWeek.bankedForNextWeek;
-                } else {
-                    week.bankedFromPrevious = 0;
-                }
-                
-                week.surplus = Math.max(0, week.completed - week.target);
-                week.bankedForNextWeek = week.bankedFromPrevious + week.surplus;
             });
             
             // Merge with existing data (don't overwrite current week if it has manual entries)

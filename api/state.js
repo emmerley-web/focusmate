@@ -18,10 +18,7 @@ const DEFAULT_STATE = {
         Fri: 8,
         Sat: 5,
         Sun: 3
-      },
-      bankedFromPrevious: 0,
-      surplus: 2,
-      bankedForNextWeek: 2
+      }
     }
   },
   allWeeklyGoals: {
@@ -34,37 +31,6 @@ const DEFAULT_STATE = {
   sessions: [],
   lastModified: new Date().toISOString()
 };
-
-// Recalculate banking chain to fix any corrupted data.
-// Banking rule: surplus = max(0, completed - target), bankedForNextWeek = prevBanked + surplus
-function validateBankingChain(allWeeksData) {
-  if (!allWeeksData || typeof allWeeksData !== 'object') return allWeeksData;
-
-  const weekKeys = Object.keys(allWeeksData)
-    .filter(k => k.startsWith('week_'))
-    .sort((a, b) => parseInt(a.split('_')[1]) - parseInt(b.split('_')[1]));
-
-  for (const key of weekKeys) {
-    const week = allWeeksData[key];
-    if (!week) continue;
-
-    const weekNum = week.weekNum || parseInt(key.split('_')[1]);
-    const prevKey = `week_${weekNum - 1}`;
-    const prevWeek = allWeeksData[prevKey];
-
-    const target = week.target || 40;
-    const completed = week.completed || 0;
-    const bankedFromPrevious = prevWeek ? (prevWeek.bankedForNextWeek || 0) : 0;
-    const surplus = Math.max(0, completed - target);
-    const bankedForNextWeek = bankedFromPrevious + surplus;
-
-    week.bankedFromPrevious = bankedFromPrevious;
-    week.surplus = surplus;
-    week.bankedForNextWeek = bankedForNextWeek;
-  }
-
-  return allWeeksData;
-}
 
 export default async function handler(req, res) {
   // CORS headers
@@ -90,8 +56,6 @@ export default async function handler(req, res) {
         if (!state.sessions) state.sessions = [];
       }
 
-      state.allWeeksData = validateBankingChain(state.allWeeksData);
-
       return res.status(200).json(state);
 
     } else if (req.method === 'POST') {
@@ -114,7 +78,7 @@ export default async function handler(req, res) {
       const { allWeeksData, allWeeklyGoals, sessions } = bodyData;
 
       const state = {
-        allWeeksData: validateBankingChain(allWeeksData || {}),
+        allWeeksData: allWeeksData || {},
         allWeeklyGoals: allWeeklyGoals || {},
         sessions: sessions || [],
         lastModified: new Date().toISOString()
