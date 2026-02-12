@@ -549,6 +549,33 @@
         let allWeeklyGoals = {};
         let sessions = [];
 
+        // Identify the authenticated user's ID from session data.
+        // The authenticated user appears in every session; partners vary.
+        function getAuthUserId(sessionsList) {
+            const counts = {};
+            sessionsList.forEach(s => {
+                if (s.users) s.users.forEach(u => {
+                    if (u.userId) counts[u.userId] = (counts[u.userId] || 0) + 1;
+                });
+            });
+            let authId = null, max = 0;
+            for (const [id, count] of Object.entries(counts)) {
+                if (count > max) { max = count; authId = id; }
+            }
+            return authId;
+        }
+
+        function isSessionCountable(session, authUserId) {
+            if (!session.users) return false;
+            const me = authUserId
+                ? session.users.find(u => u.userId === authUserId)
+                : session.users[0];
+            if (me && me.completed) return true;
+            // Also count sessions still in progress
+            const sessionEnd = new Date(session.startTime).getTime() + session.duration;
+            return Date.now() >= new Date(session.startTime).getTime() && Date.now() < sessionEnd;
+        }
+
         document.addEventListener('DOMContentLoaded', async () => {
             loadSettings();
             await loadStateFromAPI();
@@ -801,14 +828,11 @@
             const weekData = getWeekData(timezone);
             let totalUnits = 0;
             let dailyUnits = { Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0, Sun: 0 };
+            const authUserId = getAuthUserId(sessionsData);
 
             sessionsData.forEach(session => {
                 if (session.startTime && session.duration) {
-                    // Count if completed OR still in progress; skip cancelled/no-show
-                    const sessionEnd = new Date(session.startTime).getTime() + session.duration;
-                    const isInProgress = Date.now() >= new Date(session.startTime).getTime() && Date.now() < sessionEnd;
-                    const isCompleted = session.users && session.users[0] && session.users[0].completed;
-                    if (!isCompleted && !isInProgress) return;
+                    if (!isSessionCountable(session, authUserId)) return;
                     const sessionDate = new Date(session.startTime);
                     const diff = Math.floor((sessionDate - weekData.weekStart) / (1000 * 60 * 60 * 24));
                     if (diff >= 0 && diff < 7) {
@@ -968,12 +992,11 @@
             // Clear old week data
             const newWeeksData = {};
             
+            const authUserId = getAuthUserId(sessions);
+
             sessions.forEach(session => {
                 if (session.startTime && session.duration) {
-                    const sessionEnd = new Date(session.startTime).getTime() + session.duration;
-                    const isInProgress = Date.now() >= new Date(session.startTime).getTime() && Date.now() < sessionEnd;
-                    const isCompleted = session.users && session.users[0] && session.users[0].completed;
-                    if (!isCompleted && !isInProgress) return;
+                    if (!isSessionCountable(session, authUserId)) return;
                     const sessionDate = new Date(session.startTime);
                     const weekStart = new Date('2026-01-05');
                     const diff = Math.floor((sessionDate - weekStart) / (1000 * 60 * 60 * 24));
