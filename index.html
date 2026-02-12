@@ -803,7 +803,7 @@
             let dailyUnits = { Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0, Sun: 0 };
 
             sessionsData.forEach(session => {
-                if (session.startTime && session.duration) {
+                if (session.startTime && session.duration && session.users && session.users[0] && session.users[0].completed) {
                     const sessionDate = new Date(session.startTime);
                     const diff = Math.floor((sessionDate - weekData.weekStart) / (1000 * 60 * 60 * 24));
                     if (diff >= 0 && diff < 7) {
@@ -964,7 +964,7 @@
             const newWeeksData = {};
             
             sessions.forEach(session => {
-                if (session.startTime && session.duration) {
+                if (session.startTime && session.duration && session.users && session.users[0] && session.users[0].completed) {
                     const sessionDate = new Date(session.startTime);
                     const weekStart = new Date('2026-01-05');
                     const diff = Math.floor((sessionDate - weekStart) / (1000 * 60 * 60 * 24));
