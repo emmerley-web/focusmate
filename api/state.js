@@ -1,9 +1,8 @@
-import { put, list } from '@vercel/blob';
+import { kv } from '@vercel/kv';
 
-const BLOB_PREFIX = 'focusmate-state';
-const BLOB_KEY = 'focusmate-state.json';
+const KV_KEY = 'focusmate-state';
 
-// Default state if Blob is empty (Week 1 historical data)
+// Default state if KV is empty (Week 1 historical data)
 const DEFAULT_STATE = {
   allWeeksData: {
     week_1: {
@@ -19,10 +18,7 @@ const DEFAULT_STATE = {
         Fri: 8,
         Sat: 5,
         Sun: 3
-      },
-      bankedFromPrevious: 0,
-      surplus: 2,
-      bankedForNextWeek: 2
+      }
     }
   },
   allWeeklyGoals: {
@@ -36,61 +32,6 @@ const DEFAULT_STATE = {
   lastModified: new Date().toISOString()
 };
 
-// Recalculate banking chain to fix any corrupted data.
-// Banking rule: surplus = max(0, completed - target), bankedForNextWeek = prevBanked + surplus
-function validateBankingChain(allWeeksData) {
-  if (!allWeeksData || typeof allWeeksData !== 'object') return allWeeksData;
-
-  // Get week keys sorted numerically
-  const weekKeys = Object.keys(allWeeksData)
-    .filter(k => k.startsWith('week_'))
-    .sort((a, b) => parseInt(a.split('_')[1]) - parseInt(b.split('_')[1]));
-
-  for (const key of weekKeys) {
-    const week = allWeeksData[key];
-    if (!week) continue;
-
-    const weekNum = week.weekNum || parseInt(key.split('_')[1]);
-    const prevKey = `week_${weekNum - 1}`;
-    const prevWeek = allWeeksData[prevKey];
-
-    const target = week.target || 40;
-    const completed = week.completed || 0;
-    const bankedFromPrevious = prevWeek ? (prevWeek.bankedForNextWeek || 0) : 0;
-    const surplus = Math.max(0, completed - target);
-    const bankedForNextWeek = bankedFromPrevious + surplus;
-
-    week.bankedFromPrevious = bankedFromPrevious;
-    week.surplus = surplus;
-    week.bankedForNextWeek = bankedForNextWeek;
-  }
-
-  return allWeeksData;
-}
-
-async function readStateFromBlob() {
-  try {
-    const { blobs } = await list({ prefix: BLOB_PREFIX, limit: 10 });
-    if (blobs.length === 0) {
-      return null;
-    }
-
-    // Sort by uploadedAt descending to get the most recent blob
-    blobs.sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt));
-
-    const response = await fetch(blobs[0].url);
-    if (!response.ok) {
-      console.error('Failed to fetch blob content:', response.status);
-      return null;
-    }
-
-    return await response.json();
-  } catch (error) {
-    console.error('Failed to read from Blob:', error.message);
-    return null;
-  }
-}
-
 export default async function handler(req, res) {
   // CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -103,21 +44,17 @@ export default async function handler(req, res) {
 
   try {
     if (req.method === 'GET') {
-      let state = await readStateFromBlob();
+      let state = await kv.get(KV_KEY);
 
       if (!state) {
-        console.log('Blob empty, returning default state');
+        console.log('KV empty, returning default state');
         state = JSON.parse(JSON.stringify(DEFAULT_STATE));
         state.lastModified = new Date().toISOString();
       } else {
-        // Validate state structure
         if (!state.allWeeksData) state.allWeeksData = {};
         if (!state.allWeeklyGoals) state.allWeeklyGoals = {};
         if (!state.sessions) state.sessions = [];
       }
-
-      // Fix any corrupted banking data before returning
-      state.allWeeksData = validateBankingChain(state.allWeeksData);
 
       return res.status(200).json(state);
 
@@ -141,27 +78,15 @@ export default async function handler(req, res) {
       const { allWeeksData, allWeeklyGoals, sessions } = bodyData;
 
       const state = {
-        allWeeksData: validateBankingChain(allWeeksData || {}),
+        allWeeksData: allWeeksData || {},
         allWeeklyGoals: allWeeklyGoals || {},
         sessions: sessions || [],
         lastModified: new Date().toISOString()
       };
 
-      try {
-        await put(BLOB_KEY, JSON.stringify(state, null, 2), {
-          access: 'public',
-          contentType: 'application/json',
-          addRandomSuffix: false
-        });
+      await kv.set(KV_KEY, state);
 
-        return res.status(200).json({ success: true, state });
-      } catch (blobError) {
-        console.error('Failed to write to Blob:', blobError.message);
-        return res.status(500).json({
-          error: 'Failed to save state',
-          details: blobError.message
-        });
-      }
+      return res.status(200).json({ success: true, state });
 
     } else {
       return res.status(405).json({ error: 'Method not allowed' });
