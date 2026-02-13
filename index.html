@@ -570,10 +570,7 @@
             const me = authUserId
                 ? session.users.find(u => u.userId === authUserId)
                 : session.users[0];
-            if (me && me.completed) return true;
-            // Also count sessions still in progress
-            const sessionEnd = new Date(session.startTime).getTime() + session.duration;
-            return Date.now() >= new Date(session.startTime).getTime() && Date.now() < sessionEnd;
+            return me && me.completed;
         }
 
         document.addEventListener('DOMContentLoaded', async () => {
