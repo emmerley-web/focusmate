@@ -895,7 +895,7 @@
         }
 
         function updateUI(units, target, dailyUnits, weekNum, bankedFromPrevious = 0, bankedForNextWeek = 0) {
-            const filledCount = Math.min(units, target);
+            const filledCount = Math.min(units, target - bankedFromPrevious);
 
             const weekStart = new Date(2026, 0, 5);
             weekStart.setDate(weekStart.getDate() + (weekNum - 1) * 7);
