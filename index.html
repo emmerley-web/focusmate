@@ -872,8 +872,7 @@
 
             const prevWeekKey = `week_${weekNum - 1}`;
             const bankedFromPrevious = allWeeksData[prevWeekKey] ? (allWeeksData[prevWeekKey].bankedForNextWeek || 0) : 0;
-            const surplus = Math.max(0, totalUnits - targetUnits);
-            const bankedForNextWeek = bankedFromPrevious + surplus;
+            const bankedForNextWeek = Math.max(0, bankedFromPrevious + totalUnits - targetUnits);
 
             const weekKey = `week_${weekNum}`;
             allWeeksData[weekKey] = {
@@ -1073,7 +1072,7 @@
                 const prevWeekKey = idx > 0 ? sortedWeeks[idx - 1] : null;
                 const prevBanked = prevWeekKey ? (newWeeksData[prevWeekKey].bankedForNextWeek || 0) : 0;
                 week.bankedFromPrevious = prevBanked;
-                week.bankedForNextWeek = prevBanked + Math.max(0, week.completed - week.target);
+                week.bankedForNextWeek = Math.max(0, prevBanked + week.completed - week.target);
             });
 
             // Merge with existing data (don't overwrite current week if it has manual entries)
