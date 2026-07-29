@@ -111,6 +111,18 @@
             font-weight: 700;
         }
 
+        .tracker-square.banked {
+            background: linear-gradient(135deg, rgba(50, 184, 198, 0.5), rgba(45, 166, 178, 0.5));
+            border-color: rgba(50, 184, 198, 0.6);
+            color: #262828;
+            box-shadow: 0 0 8px rgba(50, 184, 198, 0.2);
+        }
+
+        .tracker-square.banked::after {
+            content: '★';
+            font-weight: 700;
+        }
+
         .daily-bars {
             display: grid;
             grid-template-columns: repeat(7, 1fr);
@@ -858,41 +870,52 @@
                 }
             });
 
+            const prevWeekKey = `week_${weekNum - 1}`;
+            const bankedFromPrevious = allWeeksData[prevWeekKey] ? (allWeeksData[prevWeekKey].bankedForNextWeek || 0) : 0;
+            const surplus = Math.max(0, totalUnits - targetUnits);
+            const bankedForNextWeek = bankedFromPrevious + surplus;
+
             const weekKey = `week_${weekNum}`;
             allWeeksData[weekKey] = {
                 weekNum,
                 weekStart: weekData.weekStart.toISOString(),
                 completed: totalUnits,
                 target: targetUnits,
-                dailyUnits
+                dailyUnits,
+                bankedFromPrevious,
+                bankedForNextWeek
             };
             saveAllWeeksData();
 
-            updateUI(totalUnits, targetUnits, dailyUnits, weekNum);
+            updateUI(totalUnits, targetUnits, dailyUnits, weekNum, bankedFromPrevious, bankedForNextWeek);
             updateSparkline();
         }
 
         function updateUIFromHistory(weekData, weekNum, targetUnits) {
-            updateUI(weekData.completed, targetUnits, weekData.dailyUnits, weekNum);
+            updateUI(weekData.completed, targetUnits, weekData.dailyUnits, weekNum, weekData.bankedFromPrevious || 0, weekData.bankedForNextWeek || 0);
         }
 
-        function updateUI(units, target, dailyUnits, weekNum) {
+        function updateUI(units, target, dailyUnits, weekNum, bankedFromPrevious = 0, bankedForNextWeek = 0) {
             const filledCount = Math.min(units, target);
 
-            const weekStart = new Date('2026-01-05');
+            const weekStart = new Date(2026, 0, 5);
             weekStart.setDate(weekStart.getDate() + (weekNum - 1) * 7);
             const weekEnd = new Date(weekStart);
             weekEnd.setDate(weekEnd.getDate() + 6);
             const dateStr = `${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}-${weekEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
 
             document.getElementById('weekHeader').textContent = `Week ${weekNum} (${dateStr})`;
-            document.getElementById('weekSubheader').textContent = `Completed: ${units}/${target}`;
+            const bankedLabel = bankedFromPrevious > 0 ? ` (${bankedFromPrevious} banked)` : '';
+            document.getElementById('weekSubheader').textContent = `Completed: ${units}/${target}${bankedLabel}`;
 
             for (let i = 1; i <= 40; i++) {
                 const sq = document.querySelector(`.tracker-square[data-unit="${i}"]`);
                 if (sq) {
-                    sq.classList.remove('filled');
-                    if (i <= filledCount) {
+                    sq.classList.remove('filled', 'banked');
+                    if (i <= bankedFromPrevious) {
+                        sq.classList.add('banked');
+                        sq.style.transitionDelay = `${(i - 1) * 0.05}s`;
+                    } else if (i <= bankedFromPrevious + filledCount) {
                         sq.classList.add('filled');
                         sq.style.transitionDelay = `${(i - 1) * 0.05}s`;
                     }
@@ -909,7 +932,8 @@
                 if (dayText) dayText.textContent = dayU;
             });
 
-            const pct = (units / target) * 100;
+            const totalTowardTarget = bankedFromPrevious + units;
+            const pct = (totalTowardTarget / target) * 100;
             const icon = document.getElementById('statusIcon');
             const text = document.getElementById('statusText');
             if (pct >= 100) {
@@ -927,11 +951,11 @@
             }
 
             const progressSection = document.getElementById('progressSection');
-            if (units > 0 && currentViewingWeekOffset === 0) {
+            if ((units > 0 || bankedFromPrevious > 0) && currentViewingWeekOffset === 0) {
                 progressSection.style.display = 'block';
-                const completedPct = (units / target) * 100;
+                const completedPct = (totalTowardTarget / target) * 100;
                 document.getElementById('progressCompletedBar').style.width = `${Math.min(completedPct, 100)}%`;
-                document.getElementById('progressCompletedLabel').textContent = `${units}/${target}`;
+                document.getElementById('progressCompletedLabel').textContent = `${totalTowardTarget}/${target}`;
             } else {
                 progressSection.style.display = 'none';
             }
@@ -1041,9 +1065,20 @@
                 }
             });
             
+            // Calculate banking chain across weeks
+            const sortedWeeks = Object.keys(newWeeksData)
+                .sort((a, b) => parseInt(a.split('_')[1]) - parseInt(b.split('_')[1]));
+            sortedWeeks.forEach((weekKey, idx) => {
+                const week = newWeeksData[weekKey];
+                const prevWeekKey = idx > 0 ? sortedWeeks[idx - 1] : null;
+                const prevBanked = prevWeekKey ? (newWeeksData[prevWeekKey].bankedForNextWeek || 0) : 0;
+                week.bankedFromPrevious = prevBanked;
+                week.bankedForNextWeek = prevBanked + Math.max(0, week.completed - week.target);
+            });
+
             // Merge with existing data (don't overwrite current week if it has manual entries)
-            allWeeksData = { ...newWeeksData, ...allWeeksData };
-            
+            allWeeksData = { ...allWeeksData, ...newWeeksData };
+
             console.log('✅ Recalculated', Object.keys(allWeeksData).length, 'weeks from sessions');
         }
 
