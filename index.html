@@ -904,8 +904,9 @@
             const dateStr = `${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}-${weekEnd.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
 
             document.getElementById('weekHeader').textContent = `Week ${weekNum} (${dateStr})`;
-            const bankedLabel = bankedFromPrevious > 0 ? ` (${bankedFromPrevious} banked)` : '';
-            document.getElementById('weekSubheader').textContent = `Completed: ${units}/${target}${bankedLabel}`;
+            const bankedInLabel = bankedFromPrevious > 0 ? ` (${bankedFromPrevious} banked)` : '';
+            const bankedOutLabel = bankedForNextWeek > 0 && units > target ? ` · ${bankedForNextWeek} banked for next week` : '';
+            document.getElementById('weekSubheader').textContent = `Completed: ${units}/${target}${bankedInLabel}${bankedOutLabel}`;
 
             for (let i = 1; i <= 40; i++) {
                 const sq = document.querySelector(`.tracker-square[data-unit="${i}"]`);
