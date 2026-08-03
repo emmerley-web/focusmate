@@ -742,10 +742,10 @@
 
         function getWeekNumber(timezone) {
             const today = getLocalDateParts(timezone);
-            const programStart = new Date(2026, 0, 5);
-            const diffTime = today - programStart;
-            const diffWeeks = Math.floor(diffTime / (7 * 24 * 60 * 60 * 1000));
-            return Math.max(1, diffWeeks + 1);
+            const todayUTC = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
+            const startUTC = Date.UTC(2026, 0, 5);
+            const diffDays = Math.floor((todayUTC - startUTC) / (24 * 60 * 60 * 1000));
+            return Math.max(1, Math.floor(diffDays / 7) + 1);
         }
 
         function getWeekData(timezone, weekOffset = 0) {
@@ -855,8 +855,9 @@
                     const sessionDate = new Date(session.startTime);
                     const localStr = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(sessionDate);
                     const [sy, sm, sd] = localStr.split('-').map(Number);
-                    const localSessionDate = new Date(sy, sm - 1, sd);
-                    const diff = Math.floor((localSessionDate - weekData.weekStart) / (1000 * 60 * 60 * 24));
+                    const sessionUTC = Date.UTC(sy, sm - 1, sd);
+                    const weekStartUTC = Date.UTC(weekData.weekStart.getFullYear(), weekData.weekStart.getMonth(), weekData.weekStart.getDate());
+                    const diff = Math.floor((sessionUTC - weekStartUTC) / (24 * 60 * 60 * 1000));
                     if (diff >= 0 && diff < 7) {
                         const durationMinutes = session.duration / (1000 * 60);
                         if (durationMinutes < 15) return;
@@ -1027,7 +1028,7 @@
             const newWeeksData = {};
 
             const authUserId = getAuthUserId(sessions);
-            const programStart = new Date(2026, 0, 5);
+            const startUTC = Date.UTC(2026, 0, 5);
 
             sessions.forEach(session => {
                 if (session.startTime && session.duration) {
@@ -1035,8 +1036,8 @@
                     const sessionDate = new Date(session.startTime);
                     const localStr = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(sessionDate);
                     const [sy, sm, sd] = localStr.split('-').map(Number);
-                    const localSessionDate = new Date(sy, sm - 1, sd);
-                    const diff = Math.floor((localSessionDate - programStart) / (1000 * 60 * 60 * 24));
+                    const sessionUTC = Date.UTC(sy, sm - 1, sd);
+                    const diff = Math.floor((sessionUTC - startUTC) / (24 * 60 * 60 * 1000));
                     const weekNum = Math.floor(diff / 7) + 1;
                     
                     if (weekNum >= 1) {
@@ -1045,7 +1046,7 @@
                         if (!newWeeksData[weekKey]) {
                             newWeeksData[weekKey] = {
                                 weekNum,
-                                weekStart: new Date(programStart.getTime() + (weekNum - 1) * 7 * 24 * 60 * 60 * 1000).toISOString(),
+                                weekStart: new Date(startUTC + (weekNum - 1) * 7 * 24 * 60 * 60 * 1000).toISOString(),
                                 completed: 0,
                                 target: 40,
                                 dailyUnits: { Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0, Sun: 0 }
