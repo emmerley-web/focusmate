@@ -593,8 +593,8 @@
             generateSparkline();
             generateWeeklyGoals();
             attachEventListeners();
-            fetchSessions();
-            refreshInterval = setInterval(fetchSessions, 5 * 60 * 1000);
+            await fetchAllSessionsAndRebuild();
+            refreshInterval = setInterval(fetchCurrentWeek, 5 * 60 * 1000);
         });
 
         function generateTrackerGrid() {
@@ -688,7 +688,7 @@
             const prevWeekBtn = document.getElementById('prevWeekBtn');
             const nextWeekBtn = document.getElementById('nextWeekBtn');
 
-            if (refreshBtn) refreshBtn.onclick = fetchSessions;
+            if (refreshBtn) refreshBtn.onclick = fetchCurrentWeek;
             if (exportBtn) exportBtn.onclick = exportCSV;
             if (timezone) timezone.onchange = saveSettings;
             if (holidayToggle) {
@@ -787,7 +787,7 @@
             document.getElementById('nextWeekBtn').style.display = isCurrentWeek ? 'none' : 'block';
 
             if (isCurrentWeek) {
-                fetchSessions();
+                fetchCurrentWeek();
                 generateWeeklyGoals();
             } else {
                 const weekKey = `week_${weekNum}`;
@@ -800,7 +800,54 @@
             }
         }
 
-        async function fetchSessions() {
+        async function fetchAllSessionsAndRebuild() {
+            const timezone = document.getElementById('timezone').value;
+            const isCustom = document.getElementById('holidayToggle').checked;
+            const customTarget = Math.max(1, Math.min(40, parseInt(document.getElementById('customTarget').value) || 40));
+            const targetUnits = isCustom ? customTarget : 40;
+
+            try {
+                const programStart = new Date(Date.UTC(2026, 0, 5)).toISOString();
+                const weekData = getWeekData(timezone);
+                const endDate = new Date(weekData.weekStart.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
+                const response = await fetch(
+                    `/api/focusmate?start=${encodeURIComponent(programStart)}&end=${encodeURIComponent(endDate)}`
+                );
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || `API returned ${response.status}`);
+                }
+
+                const data = await response.json();
+                sessions = data.sessions || [];
+                console.log('📡 Fetched ALL sessions:', sessions.length);
+
+                recalculateWeeksFromSessions();
+                repairBankingChain();
+
+                processSessionData(
+                    sessions.filter(s => {
+                        if (!s.startTime) return false;
+                        const sd = new Date(s.startTime);
+                        return sd >= weekData.weekStart && sd < new Date(weekData.weekStart.getTime() + 7 * 24 * 60 * 60 * 1000);
+                    }),
+                    timezone, targetUnits, weekData.weekNum
+                );
+                updateLastUpdated();
+            } catch (error) {
+                console.error('Full fetch error:', error);
+                showError(`API Error: ${error.message}`);
+                repairBankingChain();
+                const tz = document.getElementById('timezone').value;
+                const wd = getWeekData(tz);
+                processSessionData([], tz, targetUnits, wd.weekNum);
+                updateLastUpdated();
+            }
+        }
+
+        async function fetchCurrentWeek() {
             if (currentViewingWeekOffset !== 0) return;
 
             const timezone = document.getElementById('timezone').value;
@@ -830,11 +877,7 @@
                     return;
                 }
 
-                // Save sessions to state for cross-device sync
-                sessions = data.sessions;
-
                 processSessionData(data.sessions, timezone, targetUnits, weekData.weekNum);
-                showSuccess(`Loaded ${data.sessions.length} sessions`);
                 updateLastUpdated();
             } catch (error) {
                 console.error('Fetch error:', error);
@@ -1138,10 +1181,7 @@
                 console.log('✅ Loaded from API - allWeeklyGoals:', allWeeklyGoals);
                 console.log('✅ Loaded from API - sessions:', sessions.length, 'sessions');
 
-                // Recalculate banking chain from completed/target values.
-                // KV banking fields may be corrupted from earlier bugs; this repairs them.
-                repairBankingChain();
-                saveStateToAPI();
+                // Banking chain is rebuilt from full FocusMate API data in fetchAllSessionsAndRebuild().
 
                 // If API response is empty, also load from localStorage as secondary source
                 if (Object.keys(allWeeksData).length === 0) {
