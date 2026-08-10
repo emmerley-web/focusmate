@@ -1069,10 +1069,16 @@
             // Calculate banking chain across weeks
             const sortedWeeks = Object.keys(newWeeksData)
                 .sort((a, b) => parseInt(a.split('_')[1]) - parseInt(b.split('_')[1]));
-            sortedWeeks.forEach((weekKey, idx) => {
+            sortedWeeks.forEach((weekKey) => {
                 const week = newWeeksData[weekKey];
-                const prevWeekKey = idx > 0 ? sortedWeeks[idx - 1] : null;
-                const prevBanked = prevWeekKey ? (newWeeksData[prevWeekKey].bankedForNextWeek || 0) : 0;
+                const weekNum = parseInt(weekKey.split('_')[1]);
+                const prevWeekKey = `week_${weekNum - 1}`;
+                let prevBanked = 0;
+                if (newWeeksData[prevWeekKey]) {
+                    prevBanked = newWeeksData[prevWeekKey].bankedForNextWeek || 0;
+                } else if (allWeeksData[prevWeekKey]) {
+                    prevBanked = allWeeksData[prevWeekKey].bankedForNextWeek || 0;
+                }
                 week.bankedFromPrevious = prevBanked;
                 week.bankedForNextWeek = Math.max(0, prevBanked + week.completed - week.target);
             });
@@ -1108,8 +1114,9 @@
                 console.log('✅ Loaded from API - allWeeklyGoals:', allWeeklyGoals);
                 console.log('✅ Loaded from API - sessions:', sessions.length, 'sessions');
 
-                // RECALCULATE WEEKS FROM SESSIONS
-                recalculateWeeksFromSessions();
+                // Don't recalculate from sessions here — KV allWeeksData is the source of truth.
+                // recalculateWeeksFromSessions only has current-week sessions, so it would
+                // zero out the banking chain for historical weeks.
 
                 // If API response is empty, also load from localStorage as secondary source
                 if (Object.keys(allWeeksData).length === 0) {
