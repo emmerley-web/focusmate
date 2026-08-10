@@ -1014,7 +1014,31 @@
         }
 
         // ===== API SYNC FUNCTIONS =====
-        
+
+        function repairBankingChain() {
+            const weekKeys = Object.keys(allWeeksData).filter(k => k.startsWith('week_'));
+            if (weekKeys.length === 0) return;
+
+            const weekNums = weekKeys.map(k => parseInt(k.split('_')[1])).sort((a, b) => a - b);
+            const minWeek = weekNums[0];
+            const maxWeek = weekNums[weekNums.length - 1];
+
+            let prevBanked = 0;
+            for (let w = minWeek; w <= maxWeek; w++) {
+                const weekKey = `week_${w}`;
+                if (allWeeksData[weekKey]) {
+                    allWeeksData[weekKey].bankedFromPrevious = prevBanked;
+                    const completed = allWeeksData[weekKey].completed || 0;
+                    const target = allWeeksData[weekKey].target || 40;
+                    allWeeksData[weekKey].bankedForNextWeek = Math.max(0, prevBanked + completed - target);
+                    prevBanked = allWeeksData[weekKey].bankedForNextWeek;
+                } else {
+                    prevBanked = Math.max(0, prevBanked - 40);
+                }
+            }
+            console.log('🔧 Banking chain repaired across', weekKeys.length, 'weeks');
+        }
+
         function recalculateWeeksFromSessions() {
             if (!sessions || sessions.length === 0) {
                 console.log('📊 No sessions to recalculate');
@@ -1114,9 +1138,10 @@
                 console.log('✅ Loaded from API - allWeeklyGoals:', allWeeklyGoals);
                 console.log('✅ Loaded from API - sessions:', sessions.length, 'sessions');
 
-                // Don't recalculate from sessions here — KV allWeeksData is the source of truth.
-                // recalculateWeeksFromSessions only has current-week sessions, so it would
-                // zero out the banking chain for historical weeks.
+                // Recalculate banking chain from completed/target values.
+                // KV banking fields may be corrupted from earlier bugs; this repairs them.
+                repairBankingChain();
+                saveStateToAPI();
 
                 // If API response is empty, also load from localStorage as secondary source
                 if (Object.keys(allWeeksData).length === 0) {
